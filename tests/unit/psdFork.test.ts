@@ -70,7 +70,7 @@ describe("package manager", () => {
     for (const [file, text] of Object.entries(workflows)) {
       text.split("\n").forEach((line, i) => {
         if (/^\s*#/.test(line)) return;
-        if (/\bbun install\b/.test(line) && !/--frozen-lockfile\b/.test(line)) {
+        if (/\bbun (?:install|i)\b/.test(line) && !/--frozen-lockfile\b/.test(line)) {
           loose.push(`${file}:${i + 1}`);
         }
       });
@@ -123,5 +123,44 @@ describe("PSD401 reusable CI", () => {
     const job = jobs(workflows[file] ?? "").get(jobId) ?? "";
     expect(job).toMatch(PSD_REUSABLE);
     expect(job).toContain(`/${reusable}@`);
+  });
+
+  it("no workflow hands every secret to a reusable workflow", () => {
+    const offenders = Object.entries(workflows)
+      .filter(([, text]) => /^\s*secrets: inherit\b/m.test(text))
+      .map(([file]) => file);
+    expect(offenders).toEqual([]);
+  });
+
+  it.each(["psd-ci.yml", "license-check.yml", "security-scan.yml"])(
+    "%s limits the token to contents: read",
+    (file) => {
+      const text = workflows[file] ?? "";
+      const header = text.slice(0, text.indexOf("\njobs:\n"));
+      expect(header).toMatch(/^permissions:\n {2}contents: read$/m);
+    },
+  );
+});
+
+describe("links PSD users follow", () => {
+  it("the MCPB manifest points at this fork", () => {
+    const manifest = JSON.parse(read("mcpb/manifest.json")) as {
+      homepage: string;
+      repository: { url: string };
+      documentation: string;
+      support: string;
+    };
+    expect(manifest.homepage).toBe("https://github.com/psd401/action1-mcp");
+    expect(manifest.repository.url).toBe("https://github.com/psd401/action1-mcp");
+    expect(manifest.documentation).toBe(
+      "https://github.com/psd401/action1-mcp/blob/main/README.md",
+    );
+    expect(manifest.support).toBe("https://github.com/psd401/action1-mcp/issues");
+  });
+
+  it("the issue template sends security reports to this fork", () => {
+    const config = read(".github/ISSUE_TEMPLATE/config.yml");
+    expect(config).toContain("https://github.com/psd401/action1-mcp/security/advisories/new");
+    expect(config).not.toContain("mguttmann/action1-mcp");
   });
 });

@@ -30,11 +30,25 @@ with bun and publishes nothing.
 - Docs install from a clone of `psd401/action1-mcp` (the MCPB bundle
   built locally, or `node dist/index.js` for other hosts) instead of the
   npm package, upstream's GitHub Releases or the MCP Registry.
+- **`.gitleaks.toml`** uses the single `[allowlist]` table, which the
+  gitleaks 8.24.0 of the PSD401 security scan reads, and carries the
+  PSD401 student-account rule.
+- The MCPB manifest and the issue template link to `psd401/action1-mcp`.
 
 ### Added
 
 - PSD401 reusable workflows: `psd-ci`, `security-scan`, `claude-review`
-  and `license-check`.
+  and `license-check`. They get a read-only token and no repository
+  secrets, except `claude-review`, which gets `BEDROCK_API_KEY`.
+
+### Removed
+
+- `npm audit signatures` (registry signature check): bun has no
+  equivalent.
+- The dev-only transitive package check of `deploy-path` (`npm query
+  .dev`). The job now checks direct `devDependencies`. The e2e suite
+  still fails when the MCPB bundle holds a package outside the runtime
+  tree of `bun.lock`.
 
 ## [Unreleased]
 

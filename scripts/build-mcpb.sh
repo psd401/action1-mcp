@@ -20,7 +20,7 @@
 # scripts/reproducible-zip.mjs (sorted entries, modes 0644/0755, one
 # timestamp). The timestamp is SOURCE_DATE_EPOCH, by default the commit
 # time of HEAD, so two builds of the same commit give the same SHA-256.
-# The e2e suite checks this (tests/e2e/artifacts.test.ts).
+# The e2e suite (tests/e2e/artifacts.test.ts) and the CI job mcpb-reproducible check this.
 
 set -euo pipefail
 

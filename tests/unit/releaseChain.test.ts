@@ -234,6 +234,13 @@ describe("pinned tools", () => {
     }
     expect(unpinned).toEqual([]);
   });
+
+  it("the inspector script starts the server the way the smoke test in INSTALLATION.md does", () => {
+    const { scripts } = JSON.parse(read("package.json")) as { scripts: Record<string, string> };
+    const smoke = "node --env-file=.env dist/index.js";
+    expect(read("docs/INSTALLATION.md")).toContain(`${smoke} --help`);
+    expect(scripts.inspector).toMatch(new RegExp(` ${smoke.replace(/\./g, "\\.")}$`));
+  });
 });
 
 describe("npm distribution in the docs", () => {
@@ -244,7 +251,7 @@ describe("npm distribution in the docs", () => {
       .split("\n")
       .filter((f) => f && f !== "CHANGELOG.md" && !f.startsWith("docs/adr/"));
     const run = new RegExp(
-      `\\b(?:npx(?: -y)?|bunx|npm (?:i|install)(?: -g)?|bun (?:add|install)(?: -g)?) ${pkg.name}\\b`,
+      `\\b(?:npx|bunx|npm (?:i|install)|bun (?:add|install|i))(?: (?:-y|--yes|-g|--global))* ${pkg.name}\\b`,
     );
     const hits: string[] = [];
     for (const f of files) {

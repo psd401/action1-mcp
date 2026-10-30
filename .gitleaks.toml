@@ -19,18 +19,18 @@ description = "Synthetic student ids (1000xxx), the documented replacement"
 regexTarget = "match"
 regexes = ['''\b1000[0-9]{3}@edtools\.psd401\.net\b''']
 
-# A finding is skipped when its file matches a path OR its match matches a regex.
+# A finding is skipped when its file matches a path OR its secret matches a regex.
 # Path: vendor example values (client IDs, client_secret, tokens, passwords) in
 # the vendored Action1 OpenAPI spec; see src/codegen/spec/SOURCE.md.
 # Regexes: deliberate fake secrets in the redaction and config tests: a JWT with
 # payload {"sub":"test-user"} and signature 'signaturesignaturesignature', and
-# hex placeholders starting with abcdef0123 or abcdef1234. Matched by value, so
-# reformatting a test does not reopen a finding.
+# hex placeholders starting with abcdef0123 or abcdef1234. Each regex must match
+# the whole secret, so reformatting a test does not reopen a finding.
 [allowlist]
 description = "Vendored spec examples and the fake test secrets"
 paths = ['''^src/codegen/spec/openapi\.json$''']
-regexTarget = "match"
+regexTarget = "secret"
 regexes = [
-  '''eyJhbGciOiJIUzI1NiJ9\.eyJzdWIiOiJ0ZXN0LXVzZXIifQ\.signaturesignaturesignature''',
-  '''abcdef(?:0123|1234)[0-9a-f]*''',
+  '''^eyJhbGciOiJIUzI1NiJ9\.eyJzdWIiOiJ0ZXN0LXVzZXIifQ\.signaturesignaturesignature$''',
+  '''^abcdef(?:0123|1234)[0-9a-f]*$''',
 ]
