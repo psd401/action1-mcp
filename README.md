@@ -140,7 +140,9 @@ bun run build                    # compiles to dist/ (tsc only)
 ```
 
 Run `scripts/keychain-store.sh` in your own terminal. It prompts for each
-value with hidden input. Attach the server to Claude Code:
+value with hidden input. Attach the server to Claude Code (with fnm or
+another Node version manager, see the node path note in
+[`docs/INSTALLATION.md`](docs/INSTALLATION.md#claude-code-cli) first):
 
 ```bash
 claude mcp add action1 -e ACTION1_KEYCHAIN=true -- node $(pwd)/dist/index.js

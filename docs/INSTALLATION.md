@@ -161,8 +161,19 @@ claude mcp add action1 \
 claude mcp add --scope user action1 -e ACTION1_KEYCHAIN=true -- node /abs/path/to/dist/index.js
 ```
 
-Verify with `claude mcp list`. In a Claude Code session, `/mcp` shows the
-loaded servers and their tools.
+If you replace `node` with an absolute path, pick one that stays put.
+Under fnm, `$(command -v node)` returns a temporary per-shell path that
+is deleted when the shell exits. Use the stable default alias instead:
+`"$FNM_DIR/aliases/default/bin/node"`. The shell expands it when you run
+`claude mcp add`, and `fnm env` sets `FNM_DIR`. The folder differs per
+install (for example `~/.local/share/fnm` or
+`~/Library/Application Support/fnm`), so keep the quotes. The alias
+exists only after `fnm default <version>`. Check it with
+`ls "$FNM_DIR/aliases/default/bin/node"`.
+
+Verify with `claude mcp list`. `claude mcp get action1` shows the saved
+command. In a Claude Code session, `/mcp` shows the loaded servers and
+their tools.
 
 ### Claude Desktop (macOS / Windows)
 
