@@ -14,25 +14,24 @@ Six layers:
 4. **Performance tests** (`tests/performance/`): size caps and Markdown
    rendering on inputs with thousands of items, measured as work
    (serialised characters, cell reads), not wall-clock time.
-5. **Artifact E2E** (`tests/e2e/`, `npm run test:e2e`, CI jobs `e2e (22)` and `e2e (24)`):
-   runs `scripts/build-mcpb.sh`, checks the bundle contents and the
-   CycloneDX SBOMs (components against `package-lock.json`, hashes,
-   registry URLs), checks that the npm tarball ships no source map
-   without its sources, starts `dist/index.js` and the unpacked bundle
-   over stdio with dummy credentials (initialize + tools/list), and
+5. **Artifact E2E** (`tests/e2e/`, `bun run test:e2e`, CI jobs `e2e (22)` and `e2e (24)`):
+   runs `scripts/build-mcpb.sh`, checks the bundle contents (the runtime
+   tree against `bun.lock`), checks that a `bun pm pack` tarball ships
+   no source map without its sources, starts `dist/index.js` and the
+   unpacked bundle over stdio with dummy credentials (initialize + tools/list), and
    starts the bundle once more exactly from its manifest `mcp_config`,
    as Claude Desktop does. `dist/index.js` also runs a tool call against
    a local HTTPS stub of the Action1 API (a throwaway self-signed
    certificate from `openssl`), and `--http` is started once without
    `MCP_HTTP_TOKEN` (must refuse) and once with it (401 without the
    token, tools/list with it). A second clean build must give the same
-   SHA-256 for the bundle, the SBOMs and the npm tarball.
-   Not part of `npm test`: it needs registry access for `npm ci`.
+   SHA-256 for the bundle. Not part of `bun run test`: it needs registry
+   access for `bun install --frozen-lockfile`.
 6. **Live smoke tests** (manual): exercise a real Action1 tenant with a
    populated `.env`. Not in CI. The read-only
    [live shape check](#live-shape-check-owner-only) belongs here too.
 
-Coverage: `npm run test:coverage` (CI job `coverage`) fails when line,
+Coverage: `bun run test:coverage` (CI job `coverage`) fails when line,
 statement, function or branch coverage drops below the thresholds in
 `vitest.config.ts`: global ones, and per-file floors for the
 destructive guard, the org scope check, the raw request tool, the HTTP
@@ -41,23 +40,25 @@ transport, PII masking and the retry loop.
 ## Automated tests
 
 ```bash
-npm test                  # all four automated categories
-npm run test:unit
-npm run test:integration  # MCP protocol round trips
-npm run test:security     # guard truth table, redaction
-npm run test:performance  # size caps and rendering at scale
+bun run test              # all four automated categories
+bun run test:unit
+bun run test:integration  # MCP protocol round trips
+bun run test:security     # guard truth table, redaction
+bun run test:performance  # size caps and rendering at scale
 ```
 
 CI runs lint, the typechecks of source and tests, the tests and the
 build on Node 22, 24 and 26, build, tests and a server start on exactly
 Node 22.12 (the `engines` floor), plus format check, coverage with
-per-file floors, artifact E2E on Node 22 and 24, `npm audit` and
-`npm audit signatures`, the production install from
-`docs/DEPLOYMENT.md` (build, `npm prune --omit=dev`, audit and start of
-the pruned tree), two MCPB builds whose bundle and SBOMs must be byte
-identical, a bundle build and stdio start on Windows and macOS, the
-codegen roundtrip and a gitleaks history scan. Every job has a timeout.
-A release tag runs the same workflow on the tag commit.
+per-file floors, artifact E2E on Node 22 and 24,
+`bun audit --audit-level=high` over `bun.lock` (dev dependencies
+included), the production install from `docs/DEPLOYMENT.md` (build,
+`rm -rf node_modules`, a production-only install, a check that no dev
+package is left, and a start of that tree), two MCPB builds whose
+bundles must be byte identical, a bundle build and stdio start on
+Windows and macOS, the codegen roundtrip and a gitleaks history scan. Every job has a timeout.
+The PSD401 reusable workflows add the checks `psd-ci`, `security-scan`,
+`claude-review` and `license-check`.
 
 Some files and what they lock down:
 
@@ -102,10 +103,10 @@ Runs the MCP Inspector CLI against a set of read-only and destructive
 (dry-run) tools on a real Action1 tenant and flags any
 `Output validation error`, `Structured content does not match` or
 registration crash. Output-schema mismatches only show up at runtime, so
-run it before a release:
+run it before you merge a change to tool schemas:
 
 ```bash
-npm run build
+bun run build
 ./scripts/inspector-smoke.sh   # exits 0 if every tool's schema is healthy
 ```
 
@@ -124,7 +125,7 @@ under `fields.Name`, the `Warning` automation status) is checked by
 ```bash
 node --env-file=.env scripts/live-shape-check.mjs [--out live-shape-report.json]
 # or, with ACTION1_* exported in the shell:
-npm run live:shapes
+bun run live:shapes
 ```
 
 - It requests a token and then sends GET requests only, each with a

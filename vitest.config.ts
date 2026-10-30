@@ -4,7 +4,7 @@ export default defineConfig({
   test: {
     include: ["tests/**/*.test.ts"],
     // tests/e2e/ builds and starts the real artifacts (dist/, the MCPB
-    // bundle); it runs through `npm run test:e2e` (vitest.e2e.config.ts),
+    // bundle); it runs through `bun run test:e2e` (vitest.e2e.config.ts),
     // not in the default unit/integration run.
     exclude: ["**/node_modules/**", "tests/e2e/**"],
     environment: "node",
@@ -17,7 +17,7 @@ export default defineConfig({
     testTimeout: 30_000,
     hookTimeout: 30_000,
     // Coverage is off in the default run and switched on by
-    // `npm run test:coverage` (the CI coverage job). The thresholds are
+    // `bun run test:coverage` (the CI coverage job). The thresholds are
     // a ratchet: they sit a small margin below what the suite reaches
     // today and may only go up.
     coverage: {

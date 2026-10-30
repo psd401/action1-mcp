@@ -36,7 +36,7 @@ src/
     startAction.ts           # shared start path: OS routing, guard + POST, instance id
     helpers.ts               # jsonResult, runTool, orgIdShape, listOutputShape
     wrappers/                # high-level workflow wrappers
-    generated/index.ts       # auto-generated tools (written by npm run codegen, committed)
+    generated/index.ts       # auto-generated tools (written by bun run codegen, committed)
     generated/runtime.ts     # hand-written shared runtime for the generated tools
   resources/
     index.ts                 # MCP resources (action1://...)
@@ -55,11 +55,11 @@ src/
     format.ts                # humanise Action1 timestamps + display names
     sleep.ts                 # AbortSignal-aware setTimeout-Promise
   spec/
-    generated.ts             # spec fields and enums curated tools read (npm run codegen)
+    generated.ts             # spec fields and enums curated tools read (bun run codegen)
     entities.ts              # tolerant readers per entity (spec name, then legacy name)
     time.ts                  # Action1 YYYY-MM-DD_HH-MM-SS timestamps
   codegen/
-    generate.ts              # codegen entry point (npm run codegen)
+    generate.ts              # codegen entry point (bun run codegen)
     naming.ts                # verb-first heuristic + 3-pass conflict resolver
     outputSchema.ts          # 200-response → list / single / ok-status
     zodEmit.ts               # request-body and response schemas → Zod source
@@ -83,24 +83,29 @@ scripts/                     # spec fetch, coverage and permissions tables, MCPB
 ## Local setup
 
 ```bash
-git clone https://github.com/mguttmann/action1-mcp.git
+git clone https://github.com/psd401/action1-mcp.git
 cd action1-mcp
-npm ci
+bun install --frozen-lockfile
 cp .env.example .env  # fill in your Action1 credentials (live testing only)
-npm run build         # tsc -> dist/ (no checks; use npm run check)
-npm test              # all test categories
+bun run build         # tsc -> dist/ (no checks; use bun run check)
+bun run test          # all test categories
 ```
 
 For live testing you also need credentials in `.env`. See
 [`INSTALLATION.md`](INSTALLATION.md).
 
+bun 1.3 or newer is the package manager and script runner. CI pins bun
+1.3.9. `bun install --frozen-lockfile` installs exactly the tree in
+`bun.lock` and fails if `package.json` no longer matches it. After you
+change a dependency, run `bun install` and commit the updated `bun.lock`.
+
 Node.js versions: the server itself runs on Node.js 22.12 or newer
 (`engines` in `package.json`; the CI job `node-floor` builds, tests and
 starts it on exactly 22.12). The development tools need a little more:
 ESLint 10 requires Node.js 22.13 or newer on the 22 line, so use 22.13+
-(or 24+) for `npm run lint` and `npm run check`.
+(or 24+) for `bun run lint` and `bun run check`.
 
-Windows: `npm run build:mcpb` runs `bash scripts/build-mcpb.sh`. Run it
+Windows: `bun run build:mcpb` runs `bash scripts/build-mcpb.sh`. Run it
 from Git Bash (part of Git for Windows), so `bash` is Git's and not the
 WSL launcher. The CI job `cross-os` builds the bundle that way on
 Windows and on macOS. The repository's `.gitattributes` keeps `*.sh`
@@ -128,13 +133,13 @@ multiple HTTP calls, or a transformation we apply to the response.
    the verbs and the few older names kept for compatibility).
    The codegen scans every `.ts` file under `src/tools/` (except
    `generated/`) for these names and drops a generated tool that would
-   collide; run `npm run codegen` afterwards.
+   collide; run `bun run codegen` afterwards.
    `tests/integration/generatedTools.test.ts` fails if the scan and the
    tools the server actually registers disagree.
 5. Read fields of Action1 records through `src/spec/entities.ts`, not
    with hand-written field names or enum literals. A field or enum the
    readers do not cover yet gets a path in `src/codegen/specContract.ts`,
-   `npm run codegen`, and a reader that takes the spec name first;
+   `bun run codegen`, and a reader that takes the spec name first;
    `tests/unit/specContract.test.ts` checks every used field and value
    against the spec. Build test records with `specExample` from
    `tests/helpers/specFixtures.ts`.
@@ -189,18 +194,18 @@ Auto-generated tools live in `src/tools/generated/index.ts`. To check
 whether Action1 serves a different spec than the pinned one:
 
 ```bash
-npm run spec:check   # exit 0: unchanged, 1: drift (with a diff summary)
+bun run spec:check   # exit 0: unchanged, 1: drift (with a diff summary)
 ```
 
 To adopt a new spec, follow "Refreshing the snapshot" in
-[`src/codegen/spec/SOURCE.md`](../src/codegen/spec/SOURCE.md): `npm run
-spec:fetch`, move the candidate over `openapi.json`, update the SHA, `npm
-run codegen`, review the diff, `npm test`, and commit spec, SHA and
+[`src/codegen/spec/SOURCE.md`](../src/codegen/spec/SOURCE.md): `bun run
+spec:fetch`, move the candidate over `openapi.json`, update the SHA, `bun
+run codegen`, review the diff, `bun run test`, and commit spec, SHA and
 generated file together.
 
 `tests/unit/specSha.test.ts` fails when the committed spec, its SHA and
 the generated file disagree; the CI codegen-roundtrip job fails when the
-committed generated file is not what `npm run codegen` produces.
+committed generated file is not what `bun run codegen` produces.
 
 Every POST / PUT / PATCH / DELETE operation becomes a destructive tool
 (confirm + dry_run). The only way to emit one without the guard is a
@@ -239,7 +244,7 @@ parameter), the simplest fix is to:
 
 ## Tests
 
-- `npm test` runs `tests/unit/`, `tests/integration/`, `tests/security/` and
+- `bun run test` runs `tests/unit/`, `tests/integration/`, `tests/security/` and
   `tests/performance/`. Add a test for any behaviour change; for a bug,
   write the failing test first.
 - `tests/unit/docsConsistency.test.ts` checks the Markdown docs: relative
@@ -305,9 +310,12 @@ synthetic placeholder. `.env` is git-ignored - keep it that way.
 
 - Open against `main`. There is no `develop` / `release` branch.
 - The PR description should answer: what changed, why, and how to test.
-- The pull request template has the checklist. `npm run check` must pass
-  (lint with 0 warnings, typecheck of source and tests, format check, tests). `npm run build`
-  only compiles; it does not run the checks.
+- The pull request template has the checklist. `bun run check` must pass
+  (lint with 0 warnings, typecheck of source and tests, format check,
+  tests). `bun run build` only compiles; it does not run the checks.
+- The ruleset on `main` requires a pull request and green checks: the
+  `ci.yml` jobs plus `psd-ci`, `security-scan`, `claude-review` and
+  `license-check`.
 - For changes that affect the auto-generated tools (codegen behaviour,
   spec pin, skip list), include the regenerated `index.ts` in the same
   PR.
@@ -325,10 +333,10 @@ synthetic placeholder. `.env` is git-ignored - keep it that way.
   [private security advisory](https://github.com/mguttmann/action1-mcp/security/advisories/new),
   not a public issue.
 
-## Releases
+## Versions
 
-Releases are cut by the maintainer; the steps are in
-[`FAQ.md`](FAQ.md#how-is-a-release-cut).
+This fork publishes no releases. A version change is a pull request;
+the steps are in [`FAQ.md`](FAQ.md#how-is-a-version-changed).
 
 ## License
 

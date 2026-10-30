@@ -36,7 +36,7 @@ tool) with a `custom:<name>` key, e.g. `{ "custom:AssetTag": "ASSET-0001" }`.
 Two paths that curated tools call are not in the pinned OpenAPI spec. They are
 listed in `src/codegen/spec/known-undocumented-endpoints.json`;
 `tests/unit/curatedPaths.test.ts` fails if a curated tool starts using another
-undocumented path, and `npm run spec:check` reports whether a listed path shows
+undocumented path, and `bun run spec:check` reports whether a listed path shows
 up in the live spec.
 
 ### `POST /policies/instances/{orgId}` (Windows run-now)
@@ -78,7 +78,7 @@ accepts the name the tools assumed before (`yes`, `user`, `event_type`,
 the legacy names; audit events were not covered
 ([TESTING](../TESTING.md#live-shape-check-2026-10-26)). The legacy
 fallbacks stay because none of them can shadow a spec field the live
-records carry. `npm run live:shapes` (see `TESTING.md`) repeats the
+records carry. `bun run live:shapes` (see `TESTING.md`) repeats the
 check without exposing record values.
 
 ## Deploy update version `Latest` (unverified)

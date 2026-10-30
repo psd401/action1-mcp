@@ -103,7 +103,7 @@ for (const p of packages) {
 const header = `# Third-party notices
 
 This bundle includes the following third-party packages, installed from
-the project's package-lock.json. Each is listed with its declared license
+the project's bun.lock. Each is listed with its declared license
 and the license and notice files it ships.
 
 `;

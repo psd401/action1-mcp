@@ -4,13 +4,13 @@ Common failure modes and how to fix them.
 
 ## Setup / install
 
-### `npm run build` fails with `Cannot find module @modelcontextprotocol/server`
+### `bun run build` fails with `Cannot find module @modelcontextprotocol/server`
 
-You skipped `npm install`. Run it from the repo root:
+You skipped `bun install`. Run it from the repo root:
 
 ```bash
-npm install
-npm run build
+bun install
+bun run build
 ```
 
 ### `tests/unit/specSha.test.ts` fails
@@ -22,19 +22,19 @@ Do not edit the spec by hand; follow the refresh workflow in
 [`CONTRIBUTING.md`](CONTRIBUTING.md#re-running-codegen).
 
 This test never contacts Action1. Whether Action1 serves a different spec
-is reported by `npm run spec:check`.
+is reported by `bun run spec:check`.
 
 ### TypeScript build errors after a fresh clone
 
 ```bash
 rm -rf dist node_modules
-npm install
-npm run build
+bun install
+bun run build
 ```
 
 If the error mentions `@modelcontextprotocol/server` types, the SDK update
 broke something. Open an issue with the full TypeScript error and the
-output of `npm ls @modelcontextprotocol/server`.
+output of `bun why @modelcontextprotocol/server`.
 
 ## Runtime
 
@@ -97,7 +97,7 @@ build, your role lacks `view_endpoints`. Verify with
 
 You're on a stale build. The full ten-field `run_script` payload has
 been encoded in `src/payloads/macOsBash.ts` since v0.1. Run
-`git pull && npm install && npm run build`. If it still happens on the
+`git pull && bun install && bun run build`. If it still happens on the
 latest commit, open an issue with the full request body - it's a real
 regression and we need a HAR trace from the Action1 web console to
 diff against.
@@ -323,7 +323,7 @@ In the connector test:
 
 ## Codegen & spec
 
-### `npm run codegen` produces a different `index.ts` than what's committed
+### `bun run codegen` produces a different `index.ts` than what's committed
 
 Either the spec changed without regenerating (run the refresh workflow in
 [`CONTRIBUTING.md`](CONTRIBUTING.md#re-running-codegen)), or the

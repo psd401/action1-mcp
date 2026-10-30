@@ -8,15 +8,15 @@ install the **MCPB bundle**. Pick the section that matches your setup.
 
 | Use case | Recommended | Why |
 |---|---|---|
-| One person using Claude Code or Cursor on their workstation | **stdio** locally (`npx -y action1-mcp-server` or a source build) | No infrastructure; credentials stay on the user's machine. |
+| One person using Claude Code or Cursor on their workstation | **stdio** locally (a source build from this checkout) | No infrastructure; credentials stay on the user's machine. |
 | A team using Claude.ai or another remote MCP client | **Streamable HTTP** on loopback behind a TLS reverse proxy | One deployment, one credential to rotate. Every client shares that credential (not multi-tenant). |
 | Admins on Claude Desktop | **MCPB bundle** | Installed from a file; Claude Desktop asks for the settings and provides Node.js. |
 
 ## stdio (local)
 
-Each user points their MCP host at the npm package
-(`npx -y action1-mcp-server`, settings in the host's `env` block) or
-clones and builds the repo and points it at `dist/index.js`. See
+Each user clones and builds this repository and points their MCP host
+at `node /absolute/path/to/action1-mcp/dist/index.js` (settings in
+the host's `env` block or a `.env` file). See
 [`INSTALLATION.md`](INSTALLATION.md).
 
 ## Streamable HTTP (hosted)
@@ -28,12 +28,13 @@ requires a bearer token and checks the `Host` and `Origin` headers (see
 ### Bare metal / VM
 
 ```bash
-git clone https://github.com/mguttmann/action1-mcp.git
+git clone https://github.com/psd401/action1-mcp.git
 cd action1-mcp
-git checkout v<version>            # a release tag
-npm ci
-npm run build
-npm prune --omit=dev               # drop the build and test tooling
+git checkout <commit>              # a reviewed commit on main
+bun install --frozen-lockfile
+bun run build
+rm -rf node_modules                # drop the build and test tooling
+bun install --frozen-lockfile --production --ignore-scripts
 cp .env.example .env
 chmod 600 .env
 # Fill in ACTION1_BASE_URL, ACTION1_CLIENT_ID, ACTION1_CLIENT_SECRET,
@@ -44,6 +45,10 @@ sed -i "s/^MCP_HTTP_TOKEN=.*/MCP_HTTP_TOKEN=$(openssl rand -hex 32)/" .env
 
 node --env-file=.env dist/index.js --http --host 127.0.0.1 --port 3000
 ```
+
+`bun install --production` on top of a full install keeps the dev
+packages, so the steps delete `node_modules` and install the runtime
+tree fresh. The CI job `deploy-path` runs the same steps.
 
 Check it from the same machine:
 
@@ -197,29 +202,27 @@ are not exposed in the bundle, so they stay at their defaults.
 ### Build the bundle
 
 ```bash
-npm ci
-npm run build:mcpb
+bun install --frozen-lockfile
+bun run build:mcpb
 ```
 
 This runs `scripts/build-mcpb.sh`, which wipes and rebuilds `dist/`,
 stages the bundle under `build/mcpb/` (manifest, `mcpb/README.md`,
 `LICENSE`, `NOTICE`, a generated `THIRD_PARTY_NOTICES.md`, the compiled
-server and its runtime dependencies installed with
-`npm ci --omit=dev --ignore-scripts` from `package-lock.json`) and packs
-it to `dist/action1-mcp-<version>.mcpb`. The `mcpb/` directory holds
-only the manifest (`manifest.json`) and its README; Claude Desktop asks
-for the credentials through the manifest's `user_config` fields on
-install. The bundle contains no Node.js runtime and no credentials.
+server and its runtime dependencies from `bun.lock`) and packs it to
+`dist/action1-mcp-<version>.mcpb`. The runtime dependencies come from
+`bun install --frozen-lockfile --production --ignore-scripts`. The
+`mcpb/` directory holds only the manifest (`manifest.json`) and its
+README. Claude Desktop asks for the credentials through the
+manifest's `user_config` fields on install. The bundle contains no Node.js runtime and no credentials.
 
 ### Distribute
 
-- The `release.yml` workflow builds the bundle and attaches
-  `action1-mcp-<version>.mcpb` to the GitHub Release of every `v*.*.*`
-  tag. For stable tags it also lists that asset (and the npm package
-  `action1-mcp-server`, when npm serves the version) in the official MCP
-  Registry as `io.github.mguttmann/action1-mcp` (`mcp-registry.yml`).
+- This fork publishes no bundle. Each admin builds the `.mcpb` from a
+  checkout of this repository, or a maintainer hands out one built from
+  a reviewed commit on `main`.
 - Users double-click the file; Claude Desktop walks them through the
-  settings.
+  settings and keeps the client ID and secret in its secure storage.
 
 See [`mcpb/README.md`](../mcpb/README.md) for the manifest layout.
 
@@ -271,10 +274,11 @@ Before a shared deployment goes live:
 
 ```bash
 cd /opt/action1-mcp
-git fetch --tags && git checkout v<new-version>
-npm ci
-npm run build
-npm prune --omit=dev
+git fetch && git checkout <new-commit>
+bun install --frozen-lockfile
+bun run build
+rm -rf node_modules
+bun install --frozen-lockfile --production --ignore-scripts
 sudo systemctl restart action1-mcp
 ```
 
@@ -283,13 +287,13 @@ required settings (0.6.0 made `MCP_HTTP_TOKEN` mandatory for `--http`).
 
 `tests/unit/specSha.test.ts` only checks that the committed spec snapshot
 and its pinned SHA agree; it does not contact Action1. To find out whether
-Action1 serves a different spec, run `npm run spec:check` (exit 1 with a
+Action1 serves a different spec, run `bun run spec:check` (exit 1 with a
 diff summary on drift). The refresh workflow is in
 [`src/codegen/spec/SOURCE.md`](../src/codegen/spec/SOURCE.md).
 
 ## Rollback
 
-The server keeps no state. Check out the previous tag, rebuild and
+The server keeps no state. Check out the previous commit, rebuild and
 restart.
 
 ## Observability

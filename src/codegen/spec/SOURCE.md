@@ -28,17 +28,17 @@ Changes since the previous snapshot (2026-05-03, asset `index-BB2OdqHE.js`, 96 p
 
 The pin only proves that the committed file is the one the generator used. Whether Action1 still serves the same spec is checked separately:
 
-- `npm run spec:check` fetches the live spec and exits 0 when it matches the pinned SHA, 1 with a summary of added, removed and changed operations and schemas when it drifted, and 2 when the page could not be fetched or parsed. It also reports each entry of `known-undocumented-endpoints.json` against the live spec.
+- `bun run spec:check` fetches the live spec and exits 0 when it matches the pinned SHA, 1 with a summary of added, removed and changed operations and schemas when it drifted, and 2 when the page could not be fetched or parsed. It also reports each entry of `known-undocumented-endpoints.json` against the live spec.
 - `.github/workflows/spec-drift.yml` runs the same check weekly (and on demand). A red run means: refresh the snapshot.
 
 ## Refreshing the snapshot
 
 ```bash
-npm run spec:fetch                      # writes openapi.candidate.json (git-ignored) and prints its SHA and stats
+bun run spec:fetch                      # writes openapi.candidate.json (git-ignored) and prints its SHA and stats
 mv src/codegen/spec/openapi.candidate.json src/codegen/spec/openapi.json
 shasum -a 256 src/codegen/spec/openapi.json | awk '{printf "%s", $1}' > src/codegen/spec/openapi.sha256
-npm run codegen                         # fails on stale overrides or name collisions; fix and re-run
-npm test                                # invariants: guard on every mutating op, tools/list baseline
+bun run codegen                         # fails on stale overrides or name collisions; fix and re-run
+bun run test                            # invariants: guard on every mutating op, tools/list baseline
 ```
 
 Then update this file (asset name, date, stats, SHA, notable changes), review the diff of `src/tools/generated/index.ts`, and commit spec, SHA and generated file together. Never update the SHA without regenerating.

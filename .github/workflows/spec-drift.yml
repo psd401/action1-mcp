@@ -3,7 +3,7 @@ name: Spec drift
 # Weekly check whether Action1's public Swagger UI still ships the pinned
 # OpenAPI spec (src/codegen/spec/openapi.sha256). A red run means the
 # live spec changed: refresh it as described in src/codegen/spec/SOURCE.md.
-# Uses only Node built-ins (no npm install) and read-only permissions.
+# Uses only Node built-ins (no package install) and read-only permissions.
 
 on:
   schedule:

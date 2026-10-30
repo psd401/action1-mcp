@@ -47,8 +47,8 @@ hostname / user: `action1_search_endpoints query="<substring>"`.
 
 ### How do I connect to Claude Code?
 
-From npm, no clone needed (type the values in your shell, never into a
-chat):
+From a source build, with the settings in Claude Code's configuration
+(type the values in your shell, never into a chat):
 
 ```bash
 claude mcp add action1 \
@@ -56,10 +56,10 @@ claude mcp add action1 \
   -e ACTION1_ORG_ID=<your-org-uuid> \
   -e ACTION1_CLIENT_ID=<client-id> \
   -e ACTION1_CLIENT_SECRET=<client-secret> \
-  -- npx -y action1-mcp-server
+  -- node /absolute/path/to/action1-mcp/dist/index.js
 ```
 
-From a source build:
+With a `.env` file:
 
 ```bash
 claude mcp add action1 -- node \
@@ -74,8 +74,9 @@ options (per-project vs. per-user) and HTTP transport.
 
 ### How do I connect to Claude Desktop?
 
-The easiest way is the MCPB bundle from the GitHub Releases page:
-double-click it and fill in the wizard. For a source build instead, edit
+The easiest way is the MCPB bundle: build it in a checkout of this
+repository with `bun run build:mcpb`, double-click
+`dist/action1-mcp-<version>.mcpb` and fill in the wizard. For a source build instead, edit
 `~/Library/Application Support/Claude/claude_desktop_config.json`
 (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows) and
 add to `mcpServers`:
@@ -102,22 +103,25 @@ See [`DEPLOYMENT.md § Reverse proxy`](DEPLOYMENT.md#reverse-proxy-with-tls-cadd
 
 ### Does it work with Cursor / Continue.dev / Cody?
 
-Yes, all stdio MCP-compliant clients work: `npx -y action1-mcp-server`
-with the settings in the host's `env` block, or
-`node --env-file=/abs/.env /abs/dist/index.js` for a source build.
+Yes, all stdio MCP-compliant clients work with a source build:
+`node /absolute/path/to/action1-mcp/dist/index.js` with the settings in
+the host's `env` block, or `node --env-file=/abs/.env /abs/dist/index.js`.
 [`INSTALLATION.md`](INSTALLATION.md#continuedev--cody--generic-stdio-clients)
 has the JSON snippet.
 
 ### Is the npm package `action1-mcp-server` this project?
 
-Yes. It is published from this repository; its command is `action1-mcp`.
-Install only that exact name: similarly named packages are other code.
+It is the upstream project's package (mguttmann/action1-mcp). This fork
+publishes nothing to npm, and the upstream package is not vetted for PSD
+machines (PSD standard 07-mcp). Build from a checkout of this repository
+instead.
 
 ### Can I run it without installing Node.js?
 
-Yes, with the **MCPB bundle** (Claude Desktop only): download the
-`.mcpb` from the GitHub Releases page and double-click it. Claude Desktop
-runs it with its built-in Node.js.
+On the machine that only runs it, yes: the **MCPB bundle** (Claude
+Desktop only) runs on Claude Desktop's built-in Node.js. Building the
+bundle needs bun and Node.js, so build it on a developer machine and
+double-click the `.mcpb` on the target machine.
 
 ## Day-to-day usage
 
@@ -241,37 +245,26 @@ more.
 
 ### What's the minimum to deploy on a server?
 
-Build from a release tag, fill in `.env`, set `MCP_HTTP_TOKEN`, run on
+Build from a reviewed commit on `main`, fill in `.env`, set `MCP_HTTP_TOKEN`, run on
 `127.0.0.1` and put a TLS-terminating reverse proxy in front. The exact
 commands and the Caddy snippet are in
 [`DEPLOYMENT.md`](DEPLOYMENT.md#bare-metal--vm).
 
-### How is a release cut?
+### How is a version changed?
 
-Releases are cut by the maintainer:
+This fork publishes nothing, so a version change is an ordinary pull
+request. There is no tag, GitHub release, npm publish or registry step.
 
-1. `npm version X.Y.Z --no-git-tag-version` (updates `package.json` and
-   `package-lock.json`) and the same version in `mcpb/manifest.json` and
-   `server.json` (`version`, the `version` of both packages and the
-   version in the MCPB package's `identifier`; the `mcp-registry`
-   workflow sets `fileSha256` from the release). The server reads its version from
-   `package.json`; `tests/unit/serverContract.test.ts` and
+1. Set the same version in `package.json`, `mcpb/manifest.json` and
+   `server.json` (`version`). The server reads its version from
+   `package.json`. `tests/unit/serverContract.test.ts` and
    `tests/unit/releaseChain.test.ts` fail if the manifest or
    `server.json` differs.
-2. Move the `[Unreleased]` notes in `CHANGELOG.md` to a dated section.
-3. `npm run check` and `npm run test:e2e` green, and
+2. Move the unreleased notes in `CHANGELOG.md` to a dated section.
+3. Run `bun run check` and `bun run test:e2e` until both pass. Run
    `./scripts/inspector-smoke.sh` against a test tenant.
-4. Tag `vX.Y.Z` on a commit of `main` and push the tag. The
-   `release.yml` workflow fails unless the tag equals `v` plus the
-   `package.json` version and its commit is on `main`, runs the whole CI
-   workflow on that commit, builds the reproducible MCPB bundle and the
-   npm tarball with a CycloneDX SBOM each, and creates the GitHub
-   Release with these assets and `SHA256SUMS` (an existing release is
-   never overwritten). For a stable version it then lists the bundle in
-   the official MCP Registry (`mcp-registry.yml`). Its npm publish job
-   runs when the repository variable `NPM_PUBLISH_ENABLED` is `true`;
-   the registry job runs after it and lists the npm package only when
-   npm serves that version. The repository settings it relies on are in
+4. Open a pull request against `main`. The ruleset on `main` requires a
+   pull request and green checks; the required checks are listed in
    [`maintainers/repo-settings.md`](maintainers/repo-settings.md).
 
 ## Troubleshooting
@@ -289,10 +282,10 @@ the exact API response.
 
 The committed spec, its SHA and the generated tools disagree, usually
 because a commit changed one without the others. Don't re-pin blindly:
-review the diff, regenerate the tools (`npm run codegen`) and commit spec,
+review the diff, regenerate the tools (`bun run codegen`) and commit spec,
 SHA and generated file together. Full recipe in
 [`CONTRIBUTING.md`](CONTRIBUTING.md#re-running-codegen). Changes at
-Action1 itself are reported by `npm run spec:check`, not by this test.
+Action1 itself are reported by `bun run spec:check`, not by this test.
 
 ### Tool descriptions look fine but Claude picks the wrong tool
 

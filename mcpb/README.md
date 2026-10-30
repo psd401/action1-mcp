@@ -10,8 +10,8 @@ build.
 ## Build
 
 ```bash
-npm ci
-npm run build:mcpb       # runs scripts/build-mcpb.sh; writes dist/action1-mcp-<version>.mcpb
+bun install --frozen-lockfile
+bun run build:mcpb       # runs scripts/build-mcpb.sh; writes dist/action1-mcp-<version>.mcpb
 ```
 
 On Windows, run these commands in Git Bash (part of Git for Windows):
@@ -25,8 +25,8 @@ the build script needs bash.
   README, `LICENSE`, `NOTICE`, and the compiled server without the code
   generator;
 - installs the runtime dependencies with
-  `npm ci --omit=dev --ignore-scripts` from the committed
-  `package-lock.json`, so the bundle carries exactly the tested versions;
+  `bun install --frozen-lockfile --production --ignore-scripts` from the
+  committed `bun.lock`, so the bundle carries exactly the tested versions;
 - writes `THIRD_PARTY_NOTICES.md` with the license of every bundled
   package and fails if one is not on the allowlist in
   `scripts/third-party-notices.mjs`;
@@ -34,16 +34,10 @@ the build script needs bash.
   devDependency, then rewrites the archive reproducibly
   (`scripts/reproducible-zip.mjs`: sorted entries, modes 0644/0755, one
   timestamp from `SOURCE_DATE_EPOCH`, by default the commit time), so
-  every build of a commit has the same SHA-256;
-- writes CycloneDX SBOMs of the bundled packages for the bundle
-  (`dist/action1-mcp-<version>.mcpb.cdx.json`) and for the npm package
-  (`dist/action1-mcp-server-<version>.tgz.cdx.json`), with the SHA-512
-  hash and registry URL of every package from the lockfile, the
-  timestamp from `SOURCE_DATE_EPOCH` and a serial number derived from
-  the content, so they are reproducible too.
+  every build of a commit has the same SHA-256.
 
-`npm run test:e2e` runs the build and checks the result (contents,
-lockfile versions, SBOM hashes, stdio start of the bundled server, a
+`bun run test:e2e` runs the build and checks the result (contents,
+lockfile versions, stdio start of the bundled server, a
 second build with the same checksums). Do not copy the
 repository's `node_modules` into a bundle by hand: it contains the
 development dependencies.
@@ -56,26 +50,24 @@ no credentials.
 Double-click the `.mcpb` on macOS or Windows with Claude Desktop
 installed. Claude Desktop asks for the `user_config` fields: Action1 base
 URL, organization ID, client ID, client secret and the allow-destructive
-checkbox. The client ID and secret are marked sensitive and stored by Claude
-Desktop.
+checkbox. The client ID and secret are marked sensitive, and Claude Desktop
+stores them in its secure storage (the macOS Keychain on a Mac).
 
 ## Distribute
 
-The `release.yml` workflow attaches the `.mcpb`, the npm tarball, a
-CycloneDX SBOM for each and a `SHA256SUMS` file to the GitHub Release of
-every `v*.*.*` tag, and for stable tags lists the `.mcpb` with its
-SHA-256 in the official MCP Registry (`mcp-registry.yml`, see
-`docs/maintainers/repo-settings.md`), next to the npm package
-`action1-mcp-server`. Point users there instead of sending files
-around. For MCP hosts other than Claude Desktop, the npm package
-(`npx -y action1-mcp-server`) is the equivalent install without a
-bundle.
-Verify a download with `sha256sum --check --ignore-missing SHA256SUMS`
-(on macOS, compare `shasum -a 256 <file>` with its line in
-`SHA256SUMS`). To check that a release bundle was built from the tagged
-source, check out the tag, run `npm ci && npm run build:mcpb` with
-Node.js 24 (what the release job uses) and compare the SHA-256 of
-`dist/action1-mcp-<version>.mcpb` with `SHA256SUMS`.
+This fork publishes no bundle: there is no GitHub release, no
+`SHA256SUMS` file and no MCP Registry entry. Build the `.mcpb` from a
+checkout of <https://github.com/psd401/action1-mcp>. For MCP hosts
+other than Claude Desktop, build from source and run
+`node /absolute/path/to/action1-mcp/dist/index.js` (see
+`docs/INSTALLATION.md`, Option C).
+
+To check that a bundle someone hands you matches a commit, check out
+that commit and run
+`bun install --frozen-lockfile && bun run build:mcpb` with Node.js 24.
+Then compare the SHA-256 of `dist/action1-mcp-<version>.mcpb` with the
+file you received. The CI job `mcpb-reproducible` holds the build to one
+checksum per commit.
 
 ## Notes
 

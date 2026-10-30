@@ -28,7 +28,7 @@
 //
 // Usage (owner only, with real credentials; nothing in CI runs this):
 //   node --env-file=.env scripts/live-shape-check.mjs [--out <file>]
-//   npm run live:shapes            (when ACTION1_* are already exported)
+//   bun run live:shapes            (when ACTION1_* are already exported)
 // Env: ACTION1_BASE_URL, ACTION1_CLIENT_ID, ACTION1_CLIENT_SECRET,
 //      ACTION1_ORG_ID (the org to read from).
 // Default output: ./live-shape-report.json (git-ignored).

@@ -12,7 +12,7 @@ pinned in `src/codegen/spec/openapi.sha256`).
 | Spec version | 3.1.0 (Action1 API 3.1.0, EU bundle) |
 | Pinned spec SHA-256 | see `src/codegen/spec/openapi.sha256`; snapshot date and stats in [`SOURCE.md`](../src/codegen/spec/SOURCE.md) |
 | Operations in spec, generated tool names, curated tools | counted in the header of [`_coverage_table.md`](_coverage_table.md), which `scripts/regenerate-coverage-table.mjs` writes from the spec and the generated index |
-| Operations covered | every operation of the pinned snapshot (100 % of that snapshot, not of whatever Action1 serves today; `npm run spec:check` compares the two) |
+| Operations covered | every operation of the pinned snapshot (100 % of that snapshot, not of whatever Action1 serves today; `bun run spec:check` compares the two) |
 | Operations without a generated tool | `oauth2_token` (used internally), the operations in `SKIP_OPERATION_IDS`, and operations whose generated name equals a curated tool name; listed as `skipped` / `skipped (curated)` in [`_coverage_table.md`](_coverage_table.md) |
 | Operations with a tool that refuses to call Action1 | the two package-upload operations (`action1_init_software_upload`, `action1_upload_software_chunk`): they need request headers and a binary body the server does not send, so the tools return an explanatory error |
 | High-level workflow wrappers | see the table below |
@@ -121,16 +121,16 @@ library-script references, which the curated builders do not expose.
 
 ## Verification
 
-- `npm run codegen` is idempotent: re-running on the same pinned spec
+- `bun run codegen` is idempotent: re-running on the same pinned spec
   produces byte-identical `src/tools/generated/index.ts`.
 - `tests/unit/specSha.test.ts` fails the build if `openapi.json` SHA-256
   ever diverges from `openapi.sha256` (catches accidental edits of the
   committed snapshot). It cannot see upstream changes: that is the job of
-  `npm run spec:check` and the weekly `.github/workflows/spec-drift.yml`
+  `bun run spec:check` and the weekly `.github/workflows/spec-drift.yml`
   job, which compare the live Swagger UI spec with the pin.
 - The CI workflow at `.github/workflows/ci.yml` enforces a
   codegen-roundtrip check: every PR must regenerate cleanly with no
   uncommitted diff.
-- `npx -y @modelcontextprotocol/inspector@2.12.0 --cli ... --method tools/list`
+- `bunx @modelcontextprotocol/inspector@2.12.0 --cli ... --method tools/list`
   returns the full curated + auto-generated set with annotations,
   inputSchemas, and (where applicable) outputSchemas.

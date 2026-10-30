@@ -45,7 +45,7 @@ you prefer not to be.
 | Credential exposure | Client secret ends up in chat transcripts, logs or the repo | The agent setup guide (`CLAUDE.md`) never asks for credentials in chat; the MCPB wizard stores them; logs and error texts are redacted; `.env` is git-ignored. |
 | Operator misconfiguration | Public bind without auth, typos in switches | The HTTP transport refuses to start without a token (or on a wildcard bind without `MCP_HTTP_ALLOWED_HOSTS`); invalid switch values abort startup; production checklist in [`DEPLOYMENT.md`](DEPLOYMENT.md). |
 | Supply-chain compromise | Token or payload theft through a dependency | Few runtime dependencies, lockfile, CI fails on high or critical advisories in runtime dependencies, Dependabot updates, secret scanning config for the repo. |
-| Look-alike packages | Someone publishes a package with a similar name | The npm package is `action1-mcp-server` (registry name `io.github.mguttmann/action1-mcp`); install only that exact name, this repository or its GitHub Releases. |
+| Look-alike packages | Someone publishes a package with a similar name | This fork publishes no package. Install only from a checkout of `psd401/action1-mcp`; the upstream npm package `action1-mcp-server` is not vetted for PSD machines (PSD standard 07-mcp). |
 
 ## Destructive guard
 
@@ -327,7 +327,7 @@ protocol.
    describes a local scan for your own identifiers before committing.
 3. `tests/unit/specSha.test.ts` fails when `src/codegen/spec/openapi.json`
    changes without a matching `openapi.sha256` and regenerated tools. It
-   cannot see changes at Action1; `npm run spec:check` and the weekly
+   cannot see changes at Action1; `bun run spec:check` and the weekly
    spec-drift workflow do that.
 4. Generated tools live in `src/tools/generated/` and are committed, so a
    spec update shows up as a reviewable diff.
@@ -402,7 +402,7 @@ that hold this: [ADR 0001](adr/0001-mcp-sdk-version.md#serving-2026-07-28-2026-1
 
 ## Live shape check
 
-`npm run live:shapes` (`scripts/live-shape-check.mjs`) lets the owner of
+`bun run live:shapes` (`scripts/live-shape-check.mjs`) lets the owner of
 a tenant check which record shapes the live API returns. It is
 read-only: one OAuth token request and GET requests with a small
 `limit` on the endpoints the curated tools read, nothing else. The
