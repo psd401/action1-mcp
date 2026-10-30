@@ -86,13 +86,14 @@ scripts/                     # spec fetch, coverage and permissions tables, MCPB
 git clone https://github.com/psd401/action1-mcp.git
 cd action1-mcp
 bun install --frozen-lockfile
-cp .env.example .env  # fill in your Action1 credentials (live testing only)
 bun run build         # tsc -> dist/ (no checks; use bun run check)
 bun run test          # all test categories
 ```
 
-For live testing you also need credentials in `.env`. See
-[`INSTALLATION.md`](INSTALLATION.md).
+For live testing you also need Action1 credentials. On macOS, store
+them with `scripts/keychain-store.sh` in your own terminal. Then start
+the server with `ACTION1_KEYCHAIN=true`. See
+[`INSTALLATION.md`](INSTALLATION.md#step-2-store-the-credentials-source-install).
 
 bun 1.3 or newer is the package manager and script runner. CI pins bun
 1.3.9. `bun install --frozen-lockfile` installs exactly the tree in
@@ -255,8 +256,8 @@ parameter), the simplest fix is to:
 - Tests are pure-logic; no live API. Mock `fetch` via
   `vi.stubGlobal("fetch", …)` (see `tests/unit/auth.test.ts`).
 - Live smoke tests are documented in [`TESTING.md`](../TESTING.md). They
-  require `.env` and your real Action1 credentials. They are not part of
-  CI.
+  require your real Action1 credentials (in the Keychain, with
+  `ACTION1_KEYCHAIN=true`). They are not part of CI.
 - The destructive-tool unit tests must continue to assert that the guard
   fires in all four configurations (no-env / no-confirm / dry-run /
   happy-path).

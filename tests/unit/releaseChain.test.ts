@@ -237,9 +237,11 @@ describe("pinned tools", () => {
 
   it("the inspector script starts the server the way the smoke test in INSTALLATION.md does", () => {
     const { scripts } = JSON.parse(read("package.json")) as { scripts: Record<string, string> };
-    const smoke = "node --env-file=.env dist/index.js";
+    // Credentials come from the Keychain, never from a .env file in the checkout.
+    const smoke = "ACTION1_KEYCHAIN=true node dist/index.js";
     expect(read("docs/INSTALLATION.md")).toContain(`${smoke} --help`);
-    expect(scripts.inspector?.endsWith(` ${smoke}`), scripts.inspector).toBe(true);
+    expect(scripts.inspector?.endsWith(` -e ${smoke}`), scripts.inspector).toBe(true);
+    expect(scripts.inspector).not.toContain("env-file");
   });
 });
 

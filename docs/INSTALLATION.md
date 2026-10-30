@@ -73,37 +73,52 @@ from the environment the MCP host passes to the process (the `env` block
 of its configuration, or `-e` for Claude Code). See
 [Claude Code](#claude-code-cli) and
 [generic stdio clients](#continuedev--cody--generic-stdio-clients).
-Steps 2 and 3 below use a `.env` file instead.
+On macOS, Step 2 stores the credentials in the Keychain, and the host
+passes only `ACTION1_KEYCHAIN=true`.
 
-## Step 2: Configure environment (source install)
+## Step 2: Store the credentials (source install)
+
+On macOS, store the credentials in your login Keychain. Run the script
+in your own terminal, not through an AI agent or a chat:
 
 ```bash
-cp .env.example .env
-chmod 600 .env
+scripts/keychain-store.sh
 ```
 
-Edit `.env`:
+The script prompts for `ACTION1_BASE_URL`, `ACTION1_ORG_ID`,
+`ACTION1_CLIENT_ID` and `ACTION1_CLIENT_SECRET` with hidden input. Each
+value becomes a Keychain item: service = variable name, account = your
+login user. Run the script again to change a value.
+
+Start the server with `ACTION1_KEYCHAIN=true`. It then reads every
+credential the environment leaves unset from the Keychain. Environment
+values win over the Keychain. A value missing from both stops the server
+with `<NAME> is not set in the environment or the macOS Keychain.`
+
+Non-secret settings go in the host's `env` block, its `-e` flags or your
+shell:
 
 ```dotenv
-ACTION1_BASE_URL=https://app.eu.action1.com/api/3.0
-ACTION1_ORG_ID=<your-org-uuid>
-ACTION1_CLIENT_ID=api-key-...@action1.com
-ACTION1_CLIENT_SECRET=<your-secret>
 # Recommended: only these organizations may be addressed
 ACTION1_ALLOWED_ORG_IDS=<your-org-uuid>
 # Leave off for read-only use; true allows tools that change state
 ACTION1_ALLOW_DESTRUCTIVE=false
 ```
 
-Keep comments on their own line. Empty values mean "use the default".
-`.env` is in `.gitignore`; keep it that way. All settings are listed in
-the [README](../README.md#configuration) and in
-`node dist/index.js --help`.
+All settings are listed in the [README](../README.md#configuration) and
+in `node dist/index.js --help`.
+
+The Keychain path needs macOS. A Linux server reads one root-owned
+environment file outside the checkout, see
+[`DEPLOYMENT.md`](DEPLOYMENT.md#bare-metal--vm). On Windows or a Linux
+workstation, put the credentials in the host's `env` block (see
+[generic stdio clients](#continuedev--cody--generic-stdio-clients)).
+Never put a secret in a `.env` file in the checkout.
 
 ## Step 3: Smoke test (source install)
 
 ```bash
-node --env-file=.env dist/index.js --help
+ACTION1_KEYCHAIN=true node dist/index.js --help
 ```
 
 prints the version and the settings. To open the MCP Inspector against the
@@ -121,7 +136,7 @@ One-shot call from the command line:
 
 ```bash
 bunx @modelcontextprotocol/inspector@2.12.0 --cli \
-  node --env-file=.env dist/index.js \
+  -e ACTION1_KEYCHAIN=true node dist/index.js \
   --method tools/call --tool-name action1_list_organizations
 ```
 
@@ -129,30 +144,21 @@ bunx @modelcontextprotocol/inspector@2.12.0 --cli \
 
 ### Claude Code (CLI)
 
-With the environment in Claude Code's configuration (Option C): `-e` sets each environment variable for the server.
-Type the values in your own shell, never into a chat; Claude Code stores
-them in its configuration (`~/.claude.json` for the local and user
-scopes, `.mcp.json` in the repository for the project scope, so do not
-use the project scope with real credentials).
-
-```bash
-claude mcp add action1 \
-  -e ACTION1_BASE_URL=https://app.eu.action1.com/api/3.0 \
-  -e ACTION1_ORG_ID=<your-org-uuid> \
-  -e ACTION1_CLIENT_ID=<client-id> \
-  -e ACTION1_CLIENT_SECRET=<client-secret> \
-  -e ACTION1_ALLOWED_ORG_IDS=<your-org-uuid> \
-  -- node /absolute/path/to/action1-mcp/dist/index.js
-```
-
-From source (Option B), with the `.env` file of Step 2:
+Store the credentials in the Keychain first (Step 2). `-e` sets each
+environment variable for the server. Claude Code stores these flags in
+its configuration (`~/.claude.json` for the local and user scopes,
+`.mcp.json` in the repository for the project scope). The credentials
+stay in the Keychain.
 
 ```bash
 # stdio (recommended for local use)
-claude mcp add action1 -- node --env-file=/abs/path/to/action1-mcp/.env /abs/path/to/action1-mcp/dist/index.js
+claude mcp add action1 \
+  -e ACTION1_KEYCHAIN=true \
+  -e ACTION1_ALLOWED_ORG_IDS=<your-org-uuid> \
+  -- node /absolute/path/to/action1-mcp/dist/index.js
 
 # scope: user (everywhere) or project (current repo)
-claude mcp add --scope user action1 -- node --env-file=/abs/path/to/.env /abs/path/to/dist/index.js
+claude mcp add --scope user action1 -e ACTION1_KEYCHAIN=true -- node /abs/path/to/dist/index.js
 ```
 
 Verify with `claude mcp list`. In a Claude Code session, `/mcp` shows the
@@ -161,7 +167,7 @@ loaded servers and their tools.
 ### Claude Desktop (macOS / Windows)
 
 Two installation paths. **Option A is recommended**: Claude Desktop asks
-for the settings on install, no `.env` file or config editing needed.
+for the settings on install, no Keychain setup or config editing needed.
 
 #### Option A: MCPB bundle (recommended)
 
@@ -213,17 +219,16 @@ Edit the config file:
 - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 
-Add to the `mcpServers` map:
+Store the credentials in the Keychain first (Step 2). Then add to the
+`mcpServers` map:
 
 ```jsonc
 {
   "mcpServers": {
     "action1": {
       "command": "node",
-      "args": [
-        "--env-file=/absolute/path/to/action1-mcp/.env",
-        "/absolute/path/to/action1-mcp/dist/index.js"
-      ]
+      "args": ["/absolute/path/to/action1-mcp/dist/index.js"],
+      "env": { "ACTION1_KEYCHAIN": "true" }
     }
   }
 }
@@ -240,11 +245,14 @@ Claude.ai connects to remote MCP servers through *Custom Connectors*
 **Streamable HTTP** transport on a server reachable over HTTPS.
 
 Run the server on loopback behind a TLS reverse proxy, as described in
-[`DEPLOYMENT.md`](DEPLOYMENT.md#streamable-http-hosted):
+[`DEPLOYMENT.md`](DEPLOYMENT.md#streamable-http-hosted). Its systemd unit
+binds to `127.0.0.1:3000` and reads `/etc/action1-mcp/env`. That
+root-owned file holds the credentials, `MCP_HTTP_TOKEN`,
+`MCP_HTTP_ALLOWED_HOSTS` and `TRUST_PROXY`.
 
 ```bash
-# On your server; .env contains MCP_HTTP_TOKEN, MCP_HTTP_ALLOWED_HOSTS and TRUST_PROXY
-node --env-file=.env dist/index.js --http --host 127.0.0.1 --port 3000
+# On your server
+sudo systemctl enable --now action1-mcp
 ```
 
 In Claude.ai:
@@ -268,10 +276,8 @@ repository).
   "mcpServers": {
     "action1": {
       "command": "node",
-      "args": [
-        "--env-file=/abs/path/to/.env",
-        "/abs/path/to/dist/index.js"
-      ]
+      "args": ["/abs/path/to/dist/index.js"],
+      "env": { "ACTION1_KEYCHAIN": "true" }
     }
   }
 }
@@ -282,8 +288,9 @@ Restart Cursor; the tools appear in the chat UI.
 ### Continue.dev / Cody / generic stdio clients
 
 Any MCP client that speaks stdio works. With the server built from
-source (Option C), the usual JSON configuration (`mcpServers` in Claude
-Desktop, Cursor and most other hosts) is:
+source (Option C) and the credentials in the Keychain (Step 2), the
+usual JSON configuration (`mcpServers` in Claude Desktop, Cursor and
+most other hosts) is:
 
 ```json
 {
@@ -292,10 +299,7 @@ Desktop, Cursor and most other hosts) is:
       "command": "node",
       "args": ["/absolute/path/to/action1-mcp/dist/index.js"],
       "env": {
-        "ACTION1_BASE_URL": "https://app.eu.action1.com/api/3.0",
-        "ACTION1_ORG_ID": "<your-org-uuid>",
-        "ACTION1_CLIENT_ID": "<client-id>",
-        "ACTION1_CLIENT_SECRET": "<client-secret>",
+        "ACTION1_KEYCHAIN": "true",
         "ACTION1_ALLOWED_ORG_IDS": "<your-org-uuid>"
       }
     }
@@ -303,18 +307,22 @@ Desktop, Cursor and most other hosts) is:
 }
 ```
 
-This file then holds the credential: keep it readable for your user
-only and out of version control. With the `.env` file of Step 2, the
-command line is:
+The command line is:
 
 ```bash
-node --env-file=/abs/path/.env /abs/path/dist/index.js
+ACTION1_KEYCHAIN=true node /abs/path/dist/index.js
 ```
 
-For HTTP clients, `--http` needs `MCP_HTTP_TOKEN` in the environment:
+On Windows or a Linux workstation, put `ACTION1_BASE_URL`,
+`ACTION1_ORG_ID`, `ACTION1_CLIENT_ID` and `ACTION1_CLIENT_SECRET` in the
+`env` block instead of `ACTION1_KEYCHAIN`. That file then holds the credential. Keep it readable for your
+user only and out of version control.
+
+For HTTP clients, `--http` needs `MCP_HTTP_TOKEN`. Store it once with
+`scripts/keychain-store.sh MCP_HTTP_TOKEN`, then start the server:
 
 ```bash
-node --env-file=.env dist/index.js --http
+ACTION1_KEYCHAIN=true node dist/index.js --http
 # endpoint: http://127.0.0.1:3000/mcp, header Authorization: Bearer <token>
 ```
 
@@ -406,7 +414,7 @@ host; register them under different names (`action1-prod`,
 
 ```bash
 bunx @modelcontextprotocol/inspector@2.12.0 --cli \
-  node --env-file=.env dist/index.js --method tools/list | jq '.tools | length'
+  -e ACTION1_KEYCHAIN=true node dist/index.js --method tools/list | jq '.tools | length'
 ```
 
 A non-zero number means the server starts and registers its tools.

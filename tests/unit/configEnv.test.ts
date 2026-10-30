@@ -58,8 +58,15 @@ describe("config - the real .env.example", () => {
   });
 
   it("lists exactly the env vars the config schema reads", () => {
+    // .env.example is the template for the Linux env file (docs/DEPLOYMENT.md).
+    // ACTION1_KEYCHAIN is macOS only and a startup error on Linux, so it stays out.
+    const notInEnvFile = ["ACTION1_KEYCHAIN"];
     const keysInFile = Object.keys(parseEnv(ENV_EXAMPLE)).sort();
-    expect(keysInFile).toEqual(Object.keys(ENV_VARS).sort());
+    expect(keysInFile).toEqual(
+      Object.keys(ENV_VARS)
+        .filter((k) => !notInEnvFile.includes(k))
+        .sort(),
+    );
   });
 });
 

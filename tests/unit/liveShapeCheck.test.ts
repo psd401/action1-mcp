@@ -17,7 +17,11 @@ const mod = (await import("../../scripts/live-shape-check.mjs")) as {
     enum_values: Record<string, string[]>;
     time_formats: Record<string, string[]>;
   };
-  run: (opts: { out: string; env: Record<string, string> }) => Promise<{ results: unknown[] }>;
+  run: (opts: {
+    out: string;
+    env: Record<string, string>;
+    readKeychain?: (key: string) => string | undefined;
+  }) => Promise<{ results: unknown[] }>;
 };
 
 const SECRET_NAME = "FINANCE-LAPTOP-07";
@@ -102,6 +106,22 @@ describe("live shape check", () => {
     expect(endpoints.status).toBe(200);
     expect(endpoints.spec!.live_keys_not_in_spec).toEqual([]);
     expect(parsed.results.find((r) => r.id === "endpoint")!.status).toBe(200);
+  });
+
+  it("with ACTION1_KEYCHAIN on, reads only the unset credentials from the Keychain", async () => {
+    const asked: string[] = [];
+    const readKeychain = (key: string) => {
+      asked.push(key);
+      return key === "ACTION1_CLIENT_ID" ? "id-from-keychain" : undefined;
+    };
+    await expect(
+      mod.run({
+        out: join(mkdtempSync(join(tmpdir(), "live-shape-")), "report.json"),
+        env: { ACTION1_KEYCHAIN: "true", ACTION1_BASE_URL: "https://app.eu.action1.test/api/3.0" },
+        readKeychain,
+      }),
+    ).rejects.toThrow("Missing settings: clientSecret, orgId");
+    expect(asked.sort()).toEqual(["ACTION1_CLIENT_ID", "ACTION1_CLIENT_SECRET", "ACTION1_ORG_ID"]);
   });
 
   it("the probe list covers the curated read paths with GET only", () => {

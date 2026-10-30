@@ -11,7 +11,8 @@ Sign in to your Action1 console → **Settings → API Credentials → Add
 API Credentials**. Pick a role (smallest one that covers your needs is
 best), give it a name, and copy both the `client_id`
 (`api-key-...@action1.com`) and the `client_secret`. The secret is
-shown **once** - store it in your password manager and in `.env`.
+shown **once** - store it in your password manager and in the macOS
+Keychain (`scripts/keychain-store.sh`).
 
 See [`INSTALLATION.md`](INSTALLATION.md#getting-action1-api-credentials)
 for the full walkthrough.
@@ -47,26 +48,21 @@ hostname / user: `action1_search_endpoints query="<substring>"`.
 
 ### How do I connect to Claude Code?
 
-From a source build, with the settings in Claude Code's configuration
-(type the values in your shell, never into a chat):
+From a source build on macOS, store the credentials in the Keychain
+once. Run the script in your own terminal, never through a chat:
 
 ```bash
-claude mcp add action1 \
-  -e ACTION1_BASE_URL=https://app.eu.action1.com/api/3.0 \
-  -e ACTION1_ORG_ID=<your-org-uuid> \
-  -e ACTION1_CLIENT_ID=<client-id> \
-  -e ACTION1_CLIENT_SECRET=<client-secret> \
+scripts/keychain-store.sh
+```
+
+Then register the server:
+
+```bash
+claude mcp add action1 -e ACTION1_KEYCHAIN=true \
   -- node /absolute/path/to/action1-mcp/dist/index.js
 ```
 
-With a `.env` file:
-
-```bash
-claude mcp add action1 -- node \
-  --env-file=/abs/path/.env /abs/path/dist/index.js
-```
-
-Replace both paths with absolutes. `claude mcp list` should show it
+Replace the path with an absolute one. `claude mcp list` should show it
 after.
 
 See [`INSTALLATION.md`](INSTALLATION.md#claude-code-cli) for scope
@@ -84,9 +80,12 @@ add to `mcpServers`:
 ```jsonc
 "action1": {
   "command": "node",
-  "args": ["--env-file=/abs/path/.env", "/abs/path/dist/index.js"]
+  "args": ["/abs/path/dist/index.js"],
+  "env": { "ACTION1_KEYCHAIN": "true" }
 }
 ```
+
+This reads the credentials stored with `scripts/keychain-store.sh`.
 
 Quit Claude Desktop completely (`Cmd+Q`), re-open. The tools appear in
 the connector menu. Full guide:
@@ -104,8 +103,8 @@ See [`DEPLOYMENT.md § Reverse proxy`](DEPLOYMENT.md#reverse-proxy-with-tls-cadd
 ### Does it work with Cursor / Continue.dev / Cody?
 
 Yes, all stdio MCP-compliant clients work with a source build:
-`node /absolute/path/to/action1-mcp/dist/index.js` with the settings in
-the host's `env` block, or `node --env-file=/abs/.env /abs/dist/index.js`.
+`node /absolute/path/to/action1-mcp/dist/index.js` with
+`ACTION1_KEYCHAIN=true` and the other settings in the host's `env` block.
 [`INSTALLATION.md`](INSTALLATION.md#continuedev--cody--generic-stdio-clients)
 has the JSON snippet.
 
@@ -223,8 +222,10 @@ Action1 role without write permissions.
 
 1. In the Action1 console, issue a new credential (don't revoke the
    old one yet).
-2. Update `.env` on the server with the new `ACTION1_CLIENT_ID` and
-   `ACTION1_CLIENT_SECRET`.
+2. Update `ACTION1_CLIENT_ID` and `ACTION1_CLIENT_SECRET`. On a server,
+   edit `/etc/action1-mcp/env` with `sudoedit` and update the Bitwarden
+   copy. On macOS, re-run `scripts/keychain-store.sh ACTION1_CLIENT_ID
+   ACTION1_CLIENT_SECRET`.
 3. Restart the server.
 4. Verify it works (call `action1_list_organizations` from your host).
 5. Revoke the old credential.
@@ -245,8 +246,10 @@ more.
 
 ### What's the minimum to deploy on a server?
 
-Build from a reviewed commit on `main`, fill in `.env`, set `MCP_HTTP_TOKEN`, run on
-`127.0.0.1` and put a TLS-terminating reverse proxy in front. The exact
+Build from a reviewed commit on `main` and put the settings in
+`/etc/action1-mcp/env` (root-owned, mode 0600, outside the checkout).
+Set `MCP_HTTP_TOKEN`, run on `127.0.0.1` under systemd and put a
+TLS-terminating reverse proxy in front. The exact
 commands and the Caddy snippet are in
 [`DEPLOYMENT.md`](DEPLOYMENT.md#bare-metal--vm).
 

@@ -36,7 +36,8 @@ function sourceFiles(dir: string): string[] {
     const full = join(dir, e.name);
     if (e.isDirectory()) {
       if (e.name !== "generated" && e.name !== "codegen") out.push(...sourceFiles(full));
-    } else if (e.name.endsWith(".ts")) {
+    } else if (e.name.endsWith(".ts") && e.name !== "keychain.ts") {
+      // keychain.ts names /usr/bin/security, a file path, not an Action1 API path.
       out.push(full);
     }
   }

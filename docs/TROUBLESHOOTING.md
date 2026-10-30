@@ -60,6 +60,16 @@ Typos in the boolean switches (`ACTION1_ALLOW_DESTRUCTIVE=ture`) and
 out-of-range numbers (`PORT`, the timeout and minute settings) also abort
 startup, on purpose.
 
+With `ACTION1_KEYCHAIN=true`, `Keychain lookup of <NAME> timed out` or
+`... security exited <n>` means macOS blocked the read. The server stops
+after the first failed key. Common causes:
+
+- The login keychain is locked (SSH session, screen locked at boot).
+  Unlock it with `security unlock-keychain`.
+- The item was created in Keychain Access, so its access list does not
+  include `/usr/bin/security`. Store it again with
+  `scripts/keychain-store.sh`.
+
 ### Every tool returns `HTTP 401`
 
 The OAuth token exchange is failing. Check:
@@ -280,13 +290,15 @@ example `debug`) and restart. Where to find stderr per host:
 
 Run `claude mcp list` and check the status column. If it shows `error`,
 the server is failing to start - try the same command in a regular
-terminal (`node --env-file=/abs/path/.env /abs/path/dist/index.js`) to
+terminal (`ACTION1_KEYCHAIN=true node /abs/path/dist/index.js`) to
 see the error message. Common causes:
 
 - Wrong absolute path.
 - Node older than 22.12, the supported minimum (check `node -v`).
-- `.env` permissions wrong (must be readable by the user running Claude
-  Code).
+- A credential missing from the Keychain (`<NAME> is not set in the
+  environment or the macOS Keychain.`). Store it with
+  `scripts/keychain-store.sh <NAME>` in your own terminal.
+- `ACTION1_KEYCHAIN` missing from the `-e` flags of `claude mcp add`.
 
 ### Claude Desktop config edited but tools don't appear
 

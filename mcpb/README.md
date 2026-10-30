@@ -84,8 +84,9 @@ checksum per commit.
   `ACTION1_ALLOWED_ORG_IDS`, `ACTION1_TOOLSETS`, `ACTION1_REDACT_PII`,
   `ACTION1_DESTRUCTIVE_AUTO_CONFIRM`, `ACTION1_DEFAULT_TIMEOUT_MINUTES`,
   `ACTION1_DEFAULT_RETRY_MINUTES`, `ACTION1_LAST_SEEN_STALE_MINUTES`,
-  `ACTION1_REQUEST_TIMEOUT_MS`, `ACTION1_TOKEN_TIMEOUT_MS` and
-  `ACTION1_LOG_LEVEL`. The HTTP settings do not apply, because the bundle
+  `ACTION1_REQUEST_TIMEOUT_MS`, `ACTION1_TOKEN_TIMEOUT_MS`,
+  `ACTION1_KEYCHAIN` and `ACTION1_LOG_LEVEL`. The bundle gets the
+  credential from the wizard, so it leaves `ACTION1_KEYCHAIN` off. The HTTP settings do not apply, because the bundle
   runs over stdio. `tests/unit/mcpbManifest.test.ts` holds this list to
   `ENV_VARS` in `src/config.ts`, the source of `--help`.
 - `manifest.json` `version` must equal `package.json` `version`;

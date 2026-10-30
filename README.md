@@ -135,14 +135,15 @@ Mac). Details and troubleshooting:
 ### From source (any MCP host)
 
 ```bash
-cp .env.example .env             # fill in your Action1 credentials
+scripts/keychain-store.sh        # macOS: stores the credentials in the Keychain
 bun run build                    # compiles to dist/ (tsc only)
 ```
 
-Attach it to Claude Code:
+Run `scripts/keychain-store.sh` in your own terminal. It prompts for each
+value with hidden input. Attach the server to Claude Code:
 
 ```bash
-claude mcp add action1 -- node --env-file=$(pwd)/.env $(pwd)/dist/index.js
+claude mcp add action1 -e ACTION1_KEYCHAIN=true -- node $(pwd)/dist/index.js
 ```
 
 `bun run inspector` opens the MCP Inspector against the built server
@@ -274,9 +275,18 @@ skipped as well. Design decisions are recorded in
 
 ## Configuration
 
-All configuration is via environment variables. Copy
-[`.env.example`](.env.example) to `.env` and fill it in; empty values mean
-"use the default". `node dist/index.js --help` lists the same variables.
+All configuration is via environment variables, listed in
+[`.env.example`](.env.example) except the macOS-only `ACTION1_KEYCHAIN`.
+Empty values mean "use the default".
+`node dist/index.js --help` lists the same variables. Keep the API
+credential out of files in the checkout:
+
+- Claude Desktop: the bundle's install wizard stores it.
+- macOS, other hosts: run `scripts/keychain-store.sh` once, then start the
+  server with `ACTION1_KEYCHAIN=true`. See
+  [INSTALLATION.md](docs/INSTALLATION.md).
+- Linux service: a root-owned mode-0600 environment file outside the
+  checkout. See [DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 | Variable | Default | Description |
 |---|---|---|
@@ -296,6 +306,7 @@ All configuration is via environment variables. Copy
 | `ACTION1_LAST_SEEN_STALE_MINUTES` | `10` | Minutes since `last_seen` before an endpoint counts as offline, 1 to 1440: the offline check before an action, `connectivity.online` of `action1_get_endpoint` and the fresh / stale counts of `action1_endpoints_summary`. |
 | `ACTION1_REQUEST_TIMEOUT_MS` | `60000` | Budget for one Action1 API call including retries, 1000 to 600000. |
 | `ACTION1_TOKEN_TIMEOUT_MS` | `15000` | Timeout for one OAuth token attempt, 1000 to 600000. |
+| `ACTION1_KEYCHAIN` | `false` | macOS: reads `ACTION1_BASE_URL`, `ACTION1_ORG_ID`, `ACTION1_CLIENT_ID`, `ACTION1_CLIENT_SECRET` and `MCP_HTTP_TOKEN` from the Keychain when the environment leaves them unset. Item service = variable name, account = login user. |
 | `ACTION1_LOG_LEVEL` | `info` | `debug`, `info`, `notice`, `warn`, `error`, `critical`, `alert` or `emergency` (case-insensitive). |
 | `PORT` | `3000` | HTTP mode: listen port. |
 | `HOST` | `127.0.0.1` | HTTP mode: bind address. |
