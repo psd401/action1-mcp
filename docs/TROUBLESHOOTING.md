@@ -294,6 +294,12 @@ terminal (`ACTION1_KEYCHAIN=true node /abs/path/dist/index.js`) to
 see the error message. Common causes:
 
 - Wrong absolute path.
+- A node path that no longer exists. Version managers such as fnm give
+  each shell a temporary node path and delete it when the shell exits.
+  Check the saved command with `claude mcp get action1`, then re-add the
+  server with a stable absolute path. Under fnm, use
+  `"$FNM_DIR/aliases/default/bin/node"` (set a default first with
+  `fnm default <version>`).
 - Node older than 22.12, the supported minimum (check `node -v`).
 - A credential missing from the Keychain (`<NAME> is not set in the
   environment or the macOS Keychain.`). Store it with
