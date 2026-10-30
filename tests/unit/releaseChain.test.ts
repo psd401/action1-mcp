@@ -239,7 +239,7 @@ describe("pinned tools", () => {
     const { scripts } = JSON.parse(read("package.json")) as { scripts: Record<string, string> };
     const smoke = "node --env-file=.env dist/index.js";
     expect(read("docs/INSTALLATION.md")).toContain(`${smoke} --help`);
-    expect(scripts.inspector).toMatch(new RegExp(` ${smoke.replace(/\./g, "\\.")}$`));
+    expect(scripts.inspector?.endsWith(` ${smoke}`), scripts.inspector).toBe(true);
   });
 });
 
