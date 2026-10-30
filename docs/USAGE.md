@@ -589,7 +589,7 @@ Patterns:
   generated tool.
 
 The generator's source of truth is `src/codegen/spec/openapi.json`. When
-Action1 ships a new API version, regenerate (`npm run codegen`) and review
+Action1 ships a new API version, regenerate (`bun run codegen`) and review
 the diff.
 
 ---

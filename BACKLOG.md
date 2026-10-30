@@ -69,34 +69,29 @@ open and why.
 - CVE plan endpoint cap: the cap on `affected_endpoints` in the CVE plan has no test of its own.
 - Test helpers: `tests/integration/generatedTools.test.ts` keeps its own copy of the input sampler in `tests/helpers/toolArgs.ts`, and the bounded-state test repeats the map cap of `src/http.ts` instead of importing it.
 
-## CI, release and supply chain
+## CI and supply chain
 
 - Windows CI (built, not yet run): the `cross-os` job builds the bundle with Git Bash and starts it on `windows-latest`; it has only run on macOS so far. The first CI run on GitHub shows whether a path or tool trips on Windows.
 - Spec fetch: `scripts/fetch-spec.mjs` evaluates the literal extracted from Action1's Swagger UI with `node:vm`, which is no sandbox.
-- Release signing and concurrency: the `.mcpb` is not signed with `mcpb sign`, and `release.yml` has no concurrency group.
-- Release notes: GitHub releases use `--generate-notes` instead of the CHANGELOG section, and nothing checks that the section exists for the tag.
+- Bundle signing: the `.mcpb` is not signed with `mcpb sign`.
 - Build scripts: `scripts/*.mjs` are linted but not type-checked or formatted, and there is no shellcheck.
 - Dependabot: the majors held back on purpose (typescript, express, `@types/express`) are not ignored, and vitest and `@vitest/coverage-v8` are not grouped.
 - Install scripts: there is no `allowScripts` policy for `esbuild` and `fsevents`.
-- MCP Registry workflow (built, not yet run; it can only run once it is on `main`): the lookup that skips an already listed version does not pass `include_deleted`, so a version set to `deleted` with `mcp-publisher status` makes a re-run fail at publish instead of skipping; a hand-started run takes the static fields of `server.json` from whatever branch it is started on, not necessarily `main`; the test does not compare the committed `fileSha256` with the release (the workflow overwrites it).
-- npx examples (review minor): the `claude mcp add ... -e ACTION1_CLIENT_SECRET=...` examples in README, INSTALLATION and FAQ put the secret on the command line, so it lands in the shell history; a note on keeping it out (leading space with `HISTCONTROL=ignorespace`, or a variable read from a password manager) is missing.
-- MCP Registry workflow hardening (red team minor): a hand-started run from any branch can bring its own workflow file and still gets a namespace-wide OIDC token (inherent to write access; consider restricting dispatch to `main`).
-- Glama listing docs (review minors): the field list of Glama's admin build form in `docs/maintainers/repo-settings.md` section 7 comes from a third-party maintainer checklist, not from Glama's own docs, so check it at the first use; the README line on `glama.json` sits under "MCP Registry" although Glama is a separate directory; the intro of `repo-settings.md` speaks of GitHub settings while sections 6 and 7 cover outside listings.
-- Tools outside the lockfile: the pinned Inspector (`npx`) and the gitleaks version in `ci.yml` are not tracked by Dependabot.
+- `claude mcp add -e` examples (review minor): the `claude mcp add ... -e ACTION1_CLIENT_SECRET=...` examples in INSTALLATION and FAQ put the secret on the command line, so it lands in the shell history; a note on keeping it out (leading space with `HISTCONTROL=ignorespace`, or a variable read from a password manager) is missing.
+- Tools outside the lockfile: the pinned Inspector (`bunx`) and the gitleaks version in `ci.yml` are not tracked by Dependabot.
 - Bundle metadata: the MCPB manifest's `compatibility` block declares only the Node range (no `platforms`, no `claude_desktop`), and the bundled README is the developer build guide.
 - Bundle wizard: the MCPB wizard does not offer `ACTION1_ALLOWED_ORG_IDS`, `ACTION1_TOOLSETS` or `ACTION1_REDACT_PII`.
-- Build-tool advisories: `@anthropic-ai/mcpb` brings dev-only advisories (node-forge, tmp, zod 3) without a fix; there is no `tmp` override, exception register or full-tree audit. The tool is not deployed (`npm prune --omit=dev`).
-- npm package tree: there is no shrinkwrap, so an npm install resolves the runtime tree anew within the declared ranges, while the bundle ships the locked tree its SBOM describes.
+- Build-tool overrides: `package.json` overrides pin patched `tmp`, `node-forge` and `zod` under `@anthropic-ai/mcpb` (high advisories in its dependencies). Drop them once the MCPB CLI ships fixed versions. The CLI is not deployed (the production install drops `node_modules` and installs runtime packages only).
 - Majors held back (decision): typescript stays on 6.0 because typescript-eslint supports typescript below 6.1 only.
 - Vendored spec text: `src/codegen/spec/openapi.json` contains en dashes from Action1's own descriptions; it stays byte for byte as fetched, and the dash check in `tests/unit/docsConsistency.test.ts` skips it.
 - Example environment: the comments in `.env.example` are written by hand; its key set is held by a test, its texts are not.
 
 ## Owner steps (repository, accounts, history)
 
-- Repository settings: ruleset with required checks on `main` and release tags (the check names changed: `node-floor`, `e2e (22)`, `e2e (24)`, `cross-os (windows-latest)`, `cross-os (macos-latest)` replace the single `e2e`), workflow permissions read, CodeQL, Dependabot, private vulnerability reporting. Recommendation: apply [`docs/maintainers/repo-settings.md`](docs/maintainers/repo-settings.md) when the repository goes public. While the repository is private, macOS and Windows runner minutes count with a multiplier; if minutes run short, limit `cross-os` to push and schedule.
+- Repository settings: ruleset with required checks on `main` (the check names changed: `node-floor`, `e2e (22)`, `e2e (24)`, `cross-os (windows-latest)`, `cross-os (macos-latest)` replace the single `e2e`), workflow permissions read, CodeQL, Dependabot, private vulnerability reporting. Recommendation: apply [`docs/maintainers/repo-settings.md`](docs/maintainers/repo-settings.md) when the repository goes public. While the repository is private, macOS and Windows runner minutes count with a multiplier; if minutes run short, limit `cross-os` to push and schedule.
 - Vulnerability reporting: the advisory link in SECURITY, README and CODE_OF_CONDUCT works only after private vulnerability reporting is enabled; check the link after enabling it.
 - Branch history: earlier commits of the release branch carry an internal path and the maintainer's work e-mail in commit metadata. Recommendation: squash or rewrite the branch under the chosen public identity before it reaches `main`.
-- Live smoke before the tag: 0.6.0 has only the read-only live shape check. Recommendation: run `./scripts/inspector-smoke.sh` and `npm run live:shapes` read-only against a test tenant and record the result in `TESTING.md` before tagging.
+- Live smoke before the next version change: 0.6.0 has only the read-only live shape check. Recommendation: run `./scripts/inspector-smoke.sh` and `bun run live:shapes` read-only against a test tenant and record the result in `TESTING.md`.
 - Consumers on the old history: a consumer that pins a commit of the history before the 0.5.0 squash should move to the release commit of 0.6.0 and check a fresh recursive clone.
 - Initial commit author (decision): the first commit keeps its author; new commits use the maintainer identity, and there is no DCO sign-off requirement. The v0.6.0 tag needs the owner's go.
 - Vendored spec (decision): the Action1 spec stays vendored under `NOTICE`, outside the MIT grant.

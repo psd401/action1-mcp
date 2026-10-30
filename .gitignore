@@ -33,8 +33,8 @@ mcpb/server/
 # Local Claude Code settings
 .claude/
 
-# Candidate spec written by `npm run spec:fetch`; adopt it explicitly (see src/codegen/spec/SOURCE.md)
+# Candidate spec written by `bun run spec:fetch`; adopt it explicitly (see src/codegen/spec/SOURCE.md)
 src/codegen/spec/openapi.candidate.json
 
-# Report written by `npm run live:shapes` (scripts/live-shape-check.mjs)
+# Report written by `bun run live:shapes` (scripts/live-shape-check.mjs)
 live-shape-report.json

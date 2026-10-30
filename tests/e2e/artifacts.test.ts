@@ -1,3 +1,5 @@
+// ABOUTME: End-to-end checks of the built stdio server and the MCPB bundle:
+// ABOUTME: runs scripts/build-mcpb.sh, unpacks the bundle and starts both over stdio.
 import { execFileSync, spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
@@ -18,8 +20,8 @@ import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 // End-to-end checks of the artifacts users actually run: the compiled
-// stdio server (dist/index.js, what `node dist/index.js`, npx and the
-// gateway start) and the MCPB bundle Claude Desktop installs. The suite
+// stdio server (dist/index.js, what `node dist/index.js` and the gateway
+// start) and the MCPB bundle Claude Desktop installs. The suite
 // runs the real scripts/build-mcpb.sh against a deliberately stale
 // dist/ and inspects the produced .mcpb.
 
@@ -28,10 +30,15 @@ const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
   name: string;
   version: string;
 };
-const lock = JSON.parse(readFileSync(join(root, "package-lock.json"), "utf8")) as {
+type Deps = Record<string, string>;
+// bun.lock is JSON with trailing commas.
+const lock = JSON.parse(
+  readFileSync(join(root, "bun.lock"), "utf8").replace(/,(\s*[}\]])/g, "$1"),
+) as {
+  workspaces: { "": { dependencies?: Deps; optionalDependencies?: Deps } };
   packages: Record<
     string,
-    { version?: string; dev?: boolean; devOptional?: boolean; optional?: boolean }
+    [string, string, { dependencies?: Deps; optionalDependencies?: Deps; peerDependencies?: Deps }?]
   >;
 };
 const baseline = JSON.parse(
@@ -41,7 +48,7 @@ const baseline = JSON.parse(
 const bundlePath = join(root, "dist", `action1-mcp-${pkg.version}.mcpb`);
 let unpacked: string;
 
-/** Every installed package below `dir`, keyed like package-lock.json. */
+/** Every installed package below `dir`, keyed by install path (node_modules/a/node_modules/b). */
 function installedPackages(dir: string, prefix = ""): Map<string, string> {
   const out = new Map<string, string>();
   const nm = join(dir, "node_modules");
@@ -65,6 +72,56 @@ function installedPackages(dir: string, prefix = ""): Map<string, string> {
   return out;
 }
 
+/** Package names along a bun.lock key: "a/@s/b" -> ["a", "@s/b"]. */
+function lockNames(key: string): string[] {
+  const parts = key.split("/");
+  const names: string[] = [];
+  for (let i = 0; i < parts.length; i++) {
+    names.push(parts[i]!.startsWith("@") ? `${parts[i]}/${parts[++i]}` : parts[i]!);
+  }
+  return names;
+}
+
+/**
+ * The runtime packages bun.lock pins, as "name@version": everything
+ * reachable from the root `dependencies` (required) and from optional or
+ * peer dependencies (allowed, not required). A dependency resolves at the
+ * nearest enclosing lockfile key, as Node resolves it. Install paths are
+ * not compared: a production install hoists packages that the full tree
+ * nests under a dev dependency's copy.
+ */
+function runtimeTree(): { required: Set<string>; optional: Set<string> } {
+  const required = new Set<string>();
+  const optional = new Set<string>();
+  const seen = new Set<string>();
+  const visit = (parent: string[], deps: Deps | undefined, isOptional: boolean) => {
+    for (const name of Object.keys(deps ?? {})) {
+      let key: string | undefined;
+      for (let depth = parent.length; depth >= 0; depth--) {
+        const candidate = [...parent.slice(0, depth), name].join("/");
+        if (lock.packages[candidate]) {
+          key = candidate;
+          break;
+        }
+      }
+      if (!key) {
+        if (isOptional) continue;
+        throw new Error(`${name} (needed by ${parent.join("/") || "the root"}) is not in bun.lock`);
+      }
+      if (seen.has(`${key} ${isOptional}`)) continue;
+      seen.add(`${key} ${isOptional}`);
+      const [id, , meta] = lock.packages[key]!;
+      (isOptional ? optional : required).add(id);
+      visit(lockNames(key), meta?.dependencies, isOptional);
+      visit(lockNames(key), meta?.optionalDependencies, true);
+      visit(lockNames(key), meta?.peerDependencies, true);
+    }
+  };
+  visit([], lock.workspaces[""].dependencies, false);
+  visit([], lock.workspaces[""].optionalDependencies, true);
+  return { required, optional };
+}
+
 /** initialize + tools/list against a built entry, via the snapshot script. */
 function toolNames(entry: string): string[] {
   const out = execFileSync(
@@ -75,37 +132,15 @@ function toolNames(entry: string): string[] {
   return (JSON.parse(out) as { tools: Array<{ name: string }> }).tools.map((t) => t.name);
 }
 
-/**
- * SHA-256 of the release assets as release.yml lists them in SHA256SUMS:
- * the bundle and the SBOMs from dist/ plus the npm tarball (packed
- * without lifecycle scripts, so dist/ is not rebuilt).
- */
-function releaseSums(): string {
-  const packDir = mkdtempSync(join(tmpdir(), "action1-pack-e2e-"));
-  try {
-    execFileSync("npm", ["pack", "--ignore-scripts", "--pack-destination", packDir], {
-      cwd: root,
-      stdio: "pipe",
-    });
-    const assets = [
-      ...readdirSync(join(root, "dist"))
-        .filter((f) => f.endsWith(".mcpb") || f.endsWith(".cdx.json"))
-        .map((f) => join(root, "dist", f)),
-      ...readdirSync(packDir).map((f) => join(packDir, f)),
-    ];
-    return assets
-      .map(
-        (f) =>
-          `${createHash("sha256").update(readFileSync(f)).digest("hex")}  ${f.split(/[\\/]/).pop()}`,
-      )
-      .sort()
-      .join("\n");
-  } finally {
-    rmSync(packDir, { recursive: true, force: true });
-  }
+/** SHA-256 of the built bundle. */
+function bundleSum(): string {
+  return createHash("sha256").update(readFileSync(bundlePath)).digest("hex");
 }
 
-let firstBuildSums: string;
+/** The pinned MCPB CLI (devDependency), run through the current node. */
+const mcpbCli = join(root, "node_modules/@anthropic-ai/mcpb/dist/cli/cli.js");
+
+let firstBuildSum: string;
 
 function walkFiles(dir: string): string[] {
   return readdirSync(dir, { recursive: true, withFileTypes: true })
@@ -128,10 +163,10 @@ beforeAll(() => {
     timeout: 600_000,
   });
 
-  firstBuildSums = releaseSums();
+  firstBuildSum = bundleSum();
 
   unpacked = mkdtempSync(join(tmpdir(), "action1-mcpb-e2e-"));
-  execFileSync("npx", ["--no-install", "mcpb", "unpack", bundlePath, unpacked], {
+  execFileSync(process.execPath, [mcpbCli, "unpack", bundlePath, unpacked], {
     cwd: root,
     stdio: "pipe",
   });
@@ -173,19 +208,17 @@ describe("MCPB bundle contents", () => {
     expect(serverPkg).toMatchObject({ name: pkg.name, version: pkg.version });
   });
 
-  it("installs exactly the runtime tree pinned in package-lock.json", () => {
-    const installed = installedPackages(join(unpacked, "server"));
-    const runtime = Object.entries(lock.packages).filter(
-      ([k, v]) => k.startsWith("node_modules/") && !v.dev && !v.devOptional,
+  it("installs exactly the runtime tree pinned in bun.lock", () => {
+    const installed = new Set(
+      [...installedPackages(join(unpacked, "server"))].map(
+        ([key, version]) =>
+          `${key.slice(key.lastIndexOf("node_modules/") + "node_modules/".length)}@${version}`,
+      ),
     );
-    const required = runtime.filter(([, v]) => !v.optional).map(([k]) => k);
-    const allowed = new Map(runtime.map(([k, v]) => [k, v.version]));
+    const { required, optional } = runtimeTree();
     expect(installed.size).toBeGreaterThan(0);
-    for (const key of required) expect(installed.has(key), `${key} missing`).toBe(true);
-    for (const [key, version] of installed) {
-      expect(allowed.has(key), `${key} is not a runtime dependency in the lockfile`).toBe(true);
-      expect(version, key).toBe(allowed.get(key));
-    }
+    expect([...required].filter((id) => !installed.has(id))).toEqual([]);
+    expect([...installed].filter((id) => !required.has(id) && !optional.has(id))).toEqual([]);
   });
 
   it("includes LICENSE, NOTICE (when the repo has one) and third-party notices", () => {
@@ -206,118 +239,52 @@ describe("MCPB bundle contents", () => {
   });
 });
 
-describe("MCPB SBOM", () => {
-  it("lists exactly the packages installed in the bundle (CycloneDX)", () => {
-    const sbomPath = join(root, "dist", `action1-mcp-${pkg.version}.mcpb.cdx.json`);
-    const sbom = JSON.parse(readFileSync(sbomPath, "utf8")) as {
-      bomFormat: string;
-      metadata: { component: { name: string; version: string; type: string } };
-      components: Array<{ name: string; version: string }>;
+/** Files of the package tarball `bun pm pack` builds, without the "package/" prefix. */
+function packedFiles(): Set<string> {
+  const packDir = mkdtempSync(join(tmpdir(), "action1-pack-e2e-"));
+  try {
+    execFileSync("bun", ["pm", "pack", "--ignore-scripts", "--quiet", "--destination", packDir], {
+      cwd: root,
+      stdio: "pipe",
+    });
+    const [tarball] = readdirSync(packDir);
+    const listing = execFileSync("tar", ["-tzf", join(packDir, tarball!)], { encoding: "utf8" });
+    return new Set(
+      listing
+        .split("\n")
+        .filter(Boolean)
+        .map((p) => p.replace(/^package\//, "")),
+    );
+  } finally {
+    rmSync(packDir, { recursive: true, force: true });
+  }
+}
+
+/** Source-map links of one packed file that point at a file the package lacks. */
+function brokenMapLinks(f: string, files: Set<string>): string[] {
+  let targets: string[] = [];
+  if (f.endsWith(".map")) {
+    const map = JSON.parse(readFileSync(join(root, f), "utf8")) as {
+      sources?: string[];
+      sourceRoot?: string;
     };
-    expect(sbom.bomFormat).toBe("CycloneDX");
-    expect(sbom.metadata.component).toMatchObject({
-      name: pkg.name,
-      version: pkg.version,
-      type: "application",
-    });
-    const listed = new Set(sbom.components.map((c) => `${c.name}@${c.version}`));
-    const installed = new Set(
-      [...installedPackages(join(unpacked, "server"))].map(
-        ([key, version]) =>
-          `${key.slice(key.lastIndexOf("node_modules/") + "node_modules/".length)}@${version}`,
-      ),
+    targets = (map.sources ?? []).map((src) =>
+      posix.normalize(posix.join(posix.dirname(f), map.sourceRoot ?? "", src)),
     );
-    expect([...listed].sort()).toEqual([...installed].sort());
-  });
-
-  const sbomFiles = () => [
-    join(root, "dist", `action1-mcp-${pkg.version}.mcpb.cdx.json`),
-    join(root, "dist", `action1-mcp-server-${pkg.version}.tgz.cdx.json`),
-  ];
-  type Sbom = {
-    serialNumber: string;
-    metadata: { timestamp: string; component: { name: string; type: string } };
-    components: Array<{
-      name: string;
-      version: string;
-      hashes?: Array<{ alg: string; content: string }>;
-      externalReferences?: Array<{ type: string; url: string }>;
-    }>;
-  };
-
-  it("gives every component a SHA-512 hash and its registry tarball URL", () => {
-    for (const file of sbomFiles()) {
-      const sbom = JSON.parse(readFileSync(file, "utf8")) as Sbom;
-      expect(sbom.components.length, file).toBeGreaterThan(0);
-      const missing = sbom.components
-        .filter(
-          (c) =>
-            !c.hashes?.some((h) => h.alg === "SHA-512" && /^[0-9a-f]{128}$/.test(h.content)) ||
-            !c.externalReferences?.some(
-              (r) => r.type === "distribution" && r.url.startsWith("https://registry.npmjs.org/"),
-            ),
-        )
-        .map((c) => `${c.name}@${c.version}`);
-      expect(missing, file).toEqual([]);
+  } else if (/\.(?:js|d\.ts)$/.test(f)) {
+    const ref = /\/\/# sourceMappingURL=(\S+)\s*$/.exec(readFileSync(join(root, f), "utf8"));
+    if (ref && !ref[1]!.startsWith("data:")) {
+      targets = [posix.normalize(posix.join(posix.dirname(f), ref[1]!))];
     }
-  });
+  }
+  return targets.filter((t) => !files.has(t)).map((t) => `${f} -> ${t}`);
+}
 
-  it("writes an npm package SBOM with the same components", () => {
-    const [bundle, library] = sbomFiles().map((f) => JSON.parse(readFileSync(f, "utf8")) as Sbom);
-    expect(library!.metadata.component).toMatchObject({ name: pkg.name, type: "library" });
-    const names = (s: Sbom) => s.components.map((c) => `${c.name}@${c.version}`).sort();
-    expect(names(library!)).toEqual(names(bundle!));
-  });
-
-  it("derives serialNumber from the content and the timestamp from SOURCE_DATE_EPOCH", () => {
-    const epoch = execFileSync("git", ["log", "-1", "--format=%ct"], {
-      cwd: root,
-      encoding: "utf8",
-    });
-    for (const file of sbomFiles()) {
-      const sbom = JSON.parse(readFileSync(file, "utf8")) as Sbom;
-      expect(sbom.metadata.timestamp, file).toBe(
-        new Date(Number(epoch.trim()) * 1000).toISOString(),
-      );
-      const { serialNumber, ...rest } = sbom;
-      const digest = createHash("sha256").update(JSON.stringify(rest)).digest("hex");
-      expect(serialNumber, file).toBe(
-        `urn:uuid:${digest.slice(0, 8)}-${digest.slice(8, 12)}-5${digest.slice(13, 16)}-${((parseInt(digest[16]!, 16) & 0x3) | 0x8).toString(16)}${digest.slice(17, 20)}-${digest.slice(20, 32)}`,
-      );
-    }
-  });
-});
-
-describe("npm tarball", () => {
+describe("package tarball", () => {
   it("ships no source map without its sources", () => {
-    const out = execFileSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], {
-      cwd: root,
-      encoding: "utf8",
-    });
-    const files = new Set(
-      (JSON.parse(out) as Array<{ files: Array<{ path: string }> }>)[0]!.files.map((f) => f.path),
-    );
+    const files = packedFiles();
     expect(files.has("dist/index.js")).toBe(true);
-    const problems: string[] = [];
-    for (const f of files) {
-      if (f.endsWith(".map")) {
-        const map = JSON.parse(readFileSync(join(root, f), "utf8")) as {
-          sources?: string[];
-          sourceRoot?: string;
-        };
-        for (const src of map.sources ?? []) {
-          const target = posix.normalize(posix.join(posix.dirname(f), map.sourceRoot ?? "", src));
-          if (!files.has(target)) problems.push(`${f} -> ${target}`);
-        }
-      } else if (/\.(?:js|d\.ts)$/.test(f)) {
-        const ref = /\/\/# sourceMappingURL=(\S+)\s*$/.exec(readFileSync(join(root, f), "utf8"));
-        if (ref && !ref[1]!.startsWith("data:")) {
-          const target = posix.normalize(posix.join(posix.dirname(f), ref[1]!));
-          if (!files.has(target)) problems.push(`${f} -> ${target}`);
-        }
-      }
-    }
-    expect(problems).toEqual([]);
+    expect([...files].flatMap((f) => brokenMapLinks(f, files))).toEqual([]);
   });
 });
 
@@ -681,13 +648,13 @@ describe("dist/index.js --http", () => {
 });
 
 // Last, because it rebuilds dist/ (with identical bytes when it passes).
-describe("reproducible release assets", () => {
-  it("a second clean build gives the same SHA256SUMS", () => {
+describe("reproducible bundle", () => {
+  it("a second clean build gives the same SHA-256", () => {
     execFileSync("bash", [join(root, "scripts/build-mcpb.sh")], {
       cwd: root,
       stdio: "pipe",
       timeout: 600_000,
     });
-    expect(releaseSums()).toBe(firstBuildSums);
+    expect(bundleSum()).toBe(firstBuildSum);
   }, 600_000);
 });

@@ -9,13 +9,13 @@
     "name": "mguttmann"
   },
   "license": "MIT",
-  "homepage": "https://github.com/mguttmann/action1-mcp",
+  "homepage": "https://github.com/psd401/action1-mcp",
   "repository": {
     "type": "git",
-    "url": "https://github.com/mguttmann/action1-mcp"
+    "url": "https://github.com/psd401/action1-mcp"
   },
-  "documentation": "https://github.com/mguttmann/action1-mcp/blob/main/README.md",
-  "support": "https://github.com/mguttmann/action1-mcp/issues",
+  "documentation": "https://github.com/psd401/action1-mcp/blob/main/README.md",
+  "support": "https://github.com/psd401/action1-mcp/issues",
   "keywords": [
     "rmm",
     "action1",

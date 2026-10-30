@@ -2,7 +2,7 @@
 /**
  * Code generator for the auto-generated Action1 tools.
  *
- * Run: `npm run codegen` (tsx src/codegen/generate.ts). Commit the spec,
+ * Run: `bun run codegen` (tsx src/codegen/generate.ts). Commit the spec,
  * its SHA and the generated file together; CI's codegen-roundtrip job
  * re-runs this script and fails on any uncommitted difference.
  *
@@ -1184,7 +1184,7 @@ async function main(): Promise<void> {
   const { ops, skipped } = describe(spec);
   if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR, { recursive: true });
   // Format with the repo's Prettier config so the committed file passes
-  // `npm run format:check` and the CI codegen roundtrip at the same time.
+  // `bun run format:check` and the CI codegen roundtrip at the same time.
   const prettier = await import("prettier");
   const options = await prettier.resolveConfig(OUT_FILE);
   const out = await prettier.format(emitFile(ops, sha, skipped), {
@@ -1215,7 +1215,7 @@ async function main(): Promise<void> {
 }
 
 // Only run codegen when invoked as a script (e.g. `tsx src/codegen/generate.ts`
-// via `npm run codegen`). Skipping the side-effect on bare import lets unit
+// via `bun run codegen`). Skipping the side-effect on bare import lets unit
 // tests dynamically `import("...generate.js")` the helpers (fitLead, fitTitle)
 // without overwriting `src/tools/generated/index.ts` mid-run.
 const invokedAsScript =

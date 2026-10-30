@@ -1,0 +1,15 @@
+# ABOUTME: Calls PSD401's reusable CI, which installs with bun, runs the repo's own
+# ABOUTME: package.json scripts and a gitleaks scan, on pull requests and pushes to main.
+name: PSD CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  psd-ci:
+    uses: PSD401/.github/.github/workflows/reusable-psd-ci.yml@1aa5f5351a78b15f5c71668037f5d35b9613ae41 # v1.0.0

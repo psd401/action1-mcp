@@ -42,10 +42,12 @@ Desktop and verify it works with a read-only call.
 ## Prerequisites (verify before building)
 
 Run these checks. If anything is missing, **`ASK USER`** to install it.
-Do **not** install Node or Claude Desktop on the user's machine yourself.
+Do **not** install Node, bun or Claude Desktop on the user's machine
+yourself.
 
 ```bash
 node -v          # must be v22.12 or newer
+bun --version    # must be 1.3 or newer
 git --version    # any recent version
 # Claude Desktop must already be installed (macOS or Windows app)
 ```
@@ -54,11 +56,13 @@ If `node -v` is below v22.12, stop and tell the user to install a
 current LTS release (Node 22.12 or newer, or 24) from
 <https://nodejs.org> or their package manager.
 
-If the user only wants to install a released version, building is not
-needed: the `.mcpb` for each release is attached to the project's GitHub
-Releases page. Ask whether they prefer that before building. (The npm
-package `action1-mcp-server` is the path for other MCP hosts, not for
-this Claude Desktop setup.)
+If `bun --version` is below 1.3 or bun is missing, stop and tell the
+user to install bun 1.3 or newer from <https://bun.sh>. bun builds the
+bundle, and Claude Desktop runs it on its built-in Node.js.
+
+This fork publishes no release, so building from this checkout is the
+only install path. Do not offer upstream's GitHub Releases downloads or
+the upstream npm package: neither is vetted for PSD machines.
 
 ---
 
@@ -67,20 +71,21 @@ this Claude Desktop setup.)
 In the repo root:
 
 ```bash
-npm ci
-npm run build:mcpb
+bun install --frozen-lockfile
+bun run build:mcpb
 ```
 
 Expected output: `dist/action1-mcp-<version>.mcpb`. The script prints the
 path on its last lines; capture it for Step 3.
 
-If `npm ci` fails: the user is offline, behind a corporate proxy, or
-missing build tools. **`ASK USER`** to diagnose; do not retry blindly.
+If `bun install --frozen-lockfile` fails: the user is offline, behind a
+corporate proxy, or missing build tools. **`ASK USER`** to diagnose; do
+not retry blindly.
 
-`npm run build:mcpb` always does a clean build (it wipes `dist/` and
+`bun run build:mcpb` always does a clean build (it wipes `dist/` and
 compiles from scratch) and installs the bundle's runtime dependencies
-from `package-lock.json`, so it needs registry access just like
-`npm ci`.
+from `bun.lock`, so it needs registry access just like
+`bun install --frozen-lockfile`.
 
 ---
 
@@ -165,8 +170,8 @@ When the user wants the latest version:
 
 ```bash
 git pull
-npm ci
-npm run build:mcpb
+bun install --frozen-lockfile
+bun run build:mcpb
 ```
 
 Then re-install the new `.mcpb` via Claude Desktop > Settings >
@@ -188,23 +193,24 @@ Extensions. Stored settings carry over; the wizard does not ask again.
   later in the Extensions UI.
 - **Do not** test tools that change state (run script, deploy, reboot)
   during verification. Stick to read-only calls.
-- **Do not** install any npm package except the exact name
-  `action1-mcp-server`; similarly named packages are not this project.
-  The npm path (`npx -y action1-mcp-server`, see
-  `docs/INSTALLATION.md`) is for hosts other than Claude Desktop; there,
-  too, the user types the credentials into their own shell or config
-  file, never into the chat.
+- **Do not** install or run any npm package of this server, including
+  the upstream package `action1-mcp-server`, and do not download
+  upstream's release `.mcpb` files. Build from this checkout. For hosts
+  other than Claude Desktop, `docs/INSTALLATION.md` (Option C) runs
+  `node /absolute/path/to/action1-mcp/dist/index.js`; there, too, the
+  user types the credentials into their own shell or config file, never
+  into the chat.
 
 ---
 
 ## If anything goes wrong
 
-1. Capture the exact error message (stderr from `npm`, the error dialog
+1. Capture the exact error message (stderr from `bun`, the error dialog
    from Claude Desktop). Remove credentials and customer data from it.
 2. Check [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md).
 3. If still stuck: tell the user, share the redacted error, and ask
    whether to open an issue at
-   <https://github.com/mguttmann/action1-mcp/issues>.
+   <https://github.com/psd401/action1-mcp/issues>.
 
 ---
 

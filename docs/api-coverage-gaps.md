@@ -42,11 +42,11 @@ handle are in [`GOTCHAS.md`](GOTCHAS.md).
   2026-10-26 found the spec shapes for every record it covered; audit
   events are not verified yet
   ([`TESTING.md`](../TESTING.md#live-shape-check-2026-10-26)). The
-  tenant owner can repeat it with the read-only `npm run live:shapes`
+  tenant owner can repeat it with the read-only `bun run live:shapes`
   ([`TESTING.md`](../TESTING.md#live-shape-check-owner-only)).
 - **Spec freshness.** Generated tools follow the pinned spec. A weekly
-  workflow (`npm run spec:check`) reports when Action1 serves a different
-  spec; adopting it is a deliberate change with `npm run codegen`.
+  workflow (`bun run spec:check`) reports when Action1 serves a different
+  spec; adopting it is a deliberate change with `bun run codegen`.
 - **Live validation.** Which destructive tools have never run against a
   live tenant is listed under
   [Validation status](../README.md#validation-status) in the README.

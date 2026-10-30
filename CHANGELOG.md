@@ -6,6 +6,50 @@ and the project adheres to [Semantic Versioning](https://semver.org).
 Before 1.0, a minor version can contain breaking changes; they are listed
 first in each release.
 
+## Unreleased (psd401 fork)
+
+Peninsula School District's fork of mguttmann/action1-mcp. It builds
+with bun and publishes nothing.
+
+### Changed
+
+- **bun replaces npm.** `bun.lock` replaces `package-lock.json`; bun
+  1.3 or newer installs and runs the scripts. The server still runs on
+  Node.js 22.12 or newer (`node dist/index.js`).
+- **CI runs on bun.** Every `ci.yml` job installs with
+  `bun install --frozen-lockfile` (CI pins bun 1.3.9). `audit` runs
+  `bun audit --audit-level=high`, which covers dev dependencies too.
+  `deploy-path` deletes `node_modules` and installs the runtime packages
+  fresh, because `bun install --production` keeps installed dev packages.
+- **No publishing.** `release.yml`, `mcp-registry.yml` and
+  `scripts/release-sbom.mjs` are removed. `package.json` is `private`.
+  `server.json` names `io.github.psd401/action1-mcp` and lists no
+  packages.
+- **Overrides** for `tmp`, `node-forge` and `zod` patch high advisories
+  in the dependencies of the MCPB CLI (`@anthropic-ai/mcpb`).
+- Docs install from a clone of `psd401/action1-mcp` (the MCPB bundle
+  built locally, or `node dist/index.js` for other hosts) instead of the
+  npm package, upstream's GitHub Releases or the MCP Registry.
+- **`.gitleaks.toml`** uses the single `[allowlist]` table, which the
+  gitleaks 8.24.0 of the PSD401 security scan reads, and carries the
+  PSD401 student-account rule.
+- The MCPB manifest and the issue template link to `psd401/action1-mcp`.
+
+### Added
+
+- PSD401 reusable workflows: `psd-ci`, `security-scan`, `claude-review`
+  and `license-check`. They get a read-only token and no repository
+  secrets, except `claude-review`, which gets `BEDROCK_API_KEY`.
+
+### Removed
+
+- `npm audit signatures` (registry signature check): bun has no
+  equivalent.
+- The dev-only transitive package check of `deploy-path` (`npm query
+  .dev`). The job now checks direct `devDependencies`. The e2e suite
+  still fails when the MCPB bundle holds a package outside the runtime
+  tree of `bun.lock`.
+
 ## [Unreleased]
 
 ## [0.6.2] - 2026-10-27

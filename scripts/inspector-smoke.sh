@@ -19,7 +19,7 @@
 # Requires:
 #   - `.env` with valid ACTION1_BASE_URL / ACTION1_CLIENT_ID /
 #     ACTION1_CLIENT_SECRET / ACTION1_ORG_ID
-#   - `dist/index.js` (run `npm run build` first)
+#   - `dist/index.js` (run `bun run build` first)
 #
 # Exit codes:
 #   0 - every tool either passed schema validation or returned a
@@ -31,7 +31,7 @@ set +e
 cd "$(dirname "$0")/.."
 
 if [ ! -f "dist/index.js" ]; then
-  echo "dist/index.js missing. Run 'npm run build' first." >&2
+  echo "dist/index.js missing. Run 'bun run build' first." >&2
   exit 2
 fi
 if [ ! -f ".env" ]; then
@@ -79,7 +79,7 @@ for spec in "${TOOLS[@]}"; do
   for p in "${parts[@]:1}"; do
     args+=("--tool-arg" "$p")
   done
-  result=$(npx --yes @modelcontextprotocol/inspector@2.12.0 --cli node --env-file=.env dist/index.js \
+  result=$(bunx @modelcontextprotocol/inspector@2.12.0 --cli node --env-file=.env dist/index.js \
     --method tools/call --tool-name "$name" "${args[@]}" 2>&1)
   if echo "$result" | grep -qE 'Output validation error|Structured content does not match'; then
     echo "[SCHEMA-FAIL] $name"

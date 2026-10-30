@@ -1,5 +1,5 @@
 // Hand-written runtime shared by every auto-generated tool. NOT generated:
-// `npm run codegen` writes only ./index.ts in this directory and never
+// `bun run codegen` writes only ./index.ts in this directory and never
 // touches this file. Edit it like any other source file.
 import { assertSafeApiPath, type Action1Client } from "../../client/action1Client.js";
 import { runDestructive } from "../destructiveGuard.js";

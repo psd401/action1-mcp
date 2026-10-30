@@ -14,18 +14,24 @@ changes off unless you switch them on.
 > sponsored by or supported by Action1 Corporation. "Action1" is a
 > trademark of Action1 Corporation. See [`NOTICE`](NOTICE).
 
+> **PSD fork.** This repository is Peninsula School District's fork of
+> [mguttmann/action1-mcp](https://github.com/mguttmann/action1-mcp), run
+> as a read-only pilot. It builds with bun and publishes nothing: no npm
+> package, no GitHub release, no registry entry. Install it from a clone
+> of this repository (see [Install](#install)).
+
 ## Status
 
 Every operation of the pinned Action1 OpenAPI snapshot is reachable
 through a tool (see [What is covered](#what-is-covered)). The server
-speaks stdio and Streamable HTTP and ships as an MCPB bundle for Claude
-Desktop and as the npm package `action1-mcp-server`. Releases and their changes: [`CHANGELOG.md`](CHANGELOG.md).
+speaks stdio and Streamable HTTP, and the checkout builds an MCPB bundle
+for Claude Desktop. Changes: [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Validation status
 
 Read this before you let an agent change anything in your fleet.
 
-- **Automated tests** (`npm test`) run against mocked Action1 responses:
+- **Automated tests** (`bun run test`) run against mocked Action1 responses:
   unit tests, MCP protocol round trips through the SDK client, the
   destructive-guard truth table, redaction and size limits. Every
   generated tool that changes state is driven through MCP to prove it is
@@ -68,6 +74,9 @@ Read this before you let an agent change anything in your fleet.
   dependency has a known high or critical advisory. A weekly job reports
   when Action1 serves a different API spec than the pinned snapshot.
 - Only the latest minor release gets fixes.
+- `glama.json` names the upstream maintainer of the
+  [Glama listing](https://glama.ai/mcp/servers/mguttmann/action1-mcp).
+  That listing is upstream's; this fork has none.
 - Issues and pull requests are welcome; see
   [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) and the
   [Code of Conduct](CODE_OF_CONDUCT.md).
@@ -94,45 +103,40 @@ listed in [`docs/api-coverage-gaps.md`](docs/api-coverage-gaps.md).
 
 ## Install
 
+All install paths start from a clone of this repository. Building needs
+bun 1.3 or newer and Node.js 22.12 or newer (`engines` in
+`package.json`); CI tests Node 22, 24 and 26.
+
+```bash
+git clone https://github.com/psd401/action1-mcp.git
+cd action1-mcp
+bun install --frozen-lockfile    # installs exactly the versions in bun.lock
+```
+
 ### Claude Desktop: MCPB bundle (recommended)
 
-1. Download `action1-mcp-<version>.mcpb` from the project's
-   [GitHub Releases](https://github.com/mguttmann/action1-mcp/releases).
-   The release workflow attaches it to every version tag.
-2. Double-click it (or drag it onto Claude Desktop, or use Settings >
-   Extensions > Install from file).
+1. Build the bundle in the checkout:
+
+   ```bash
+   bun run build:mcpb               # writes dist/action1-mcp-<version>.mcpb
+   ```
+
+2. Double-click `dist/action1-mcp-<version>.mcpb` (or drag it onto
+   Claude Desktop, or use Settings > Extensions > Install from file).
 3. Fill in the wizard: API base URL of your region, organization ID,
    client ID and client secret, and whether destructive operations are
    allowed (leave this off at first).
 
-Claude Desktop runs the bundle with its built-in Node.js. Details and
-troubleshooting: [`docs/INSTALLATION.md`](docs/INSTALLATION.md#claude-desktop-macos--windows).
-
-### MCP Registry
-
-The release workflow lists each stable release in the official
-[MCP Registry](https://registry.modelcontextprotocol.io) as
-`io.github.mguttmann/action1-mcp`: the bundle (download URL and SHA-256
-of the release asset) and, from 0.6.2 on, the npm package
-`action1-mcp-server`, both with the same environment variables. MCP hosts and
-directories that read the registry can install it from there. Only that
-name is this project; Action1 servers under other namespaces are
-different code.
-
-`glama.json` names the maintainer of the
-[Glama listing](https://glama.ai/mcp/servers/mguttmann/action1-mcp).
+Claude Desktop runs the bundle with its built-in Node.js and keeps the
+client ID and secret in its secure storage (the macOS Keychain on a
+Mac). Details and troubleshooting:
+[`docs/INSTALLATION.md`](docs/INSTALLATION.md#claude-desktop-macos--windows).
 
 ### From source (any MCP host)
 
-Requires Node.js 22.12 or newer (`engines` in `package.json`); CI tests
-Node 22, 24 and 26.
-
 ```bash
-git clone https://github.com/mguttmann/action1-mcp.git
-cd action1-mcp
-npm ci
 cp .env.example .env             # fill in your Action1 credentials
-npm run build                    # compiles to dist/ (tsc only)
+bun run build                    # compiles to dist/ (tsc only)
 ```
 
 Attach it to Claude Code:
@@ -141,39 +145,22 @@ Attach it to Claude Code:
 claude mcp add action1 -- node --env-file=$(pwd)/.env $(pwd)/dist/index.js
 ```
 
-`npm run inspector` opens the MCP Inspector against the built server
+`bun run inspector` opens the MCP Inspector against the built server
 (needs Node 22.19 or newer). Other hosts (Claude Desktop with a JSON
 config, Claude.ai, Cursor, Continue.dev, Cody) are covered in
 [`docs/INSTALLATION.md`](docs/INSTALLATION.md).
 
-### npm (npx, any stdio MCP host)
+### Other stdio MCP hosts
 
-The server is published on npm as
-[`action1-mcp-server`](https://www.npmjs.com/package/action1-mcp-server)
-(command `action1-mcp`). Only that exact name is this project. `npx`
-fetches and runs it, so no clone or build is needed; Node.js 22.12 or
-newer must be installed.
-
-Attach it to Claude Code (the values land in Claude Code's own
-configuration; type them in your shell, never into a chat):
-
-```bash
-claude mcp add action1 \
-  -e ACTION1_BASE_URL=https://app.eu.action1.com/api/3.0 \
-  -e ACTION1_ORG_ID=<your-org-uuid> \
-  -e ACTION1_CLIENT_ID=<client-id> \
-  -e ACTION1_CLIENT_SECRET=<client-secret> \
-  -- npx -y action1-mcp-server
-```
-
-Any other stdio host takes the same command in its JSON configuration:
+Any stdio host starts the built server with `node` and the absolute
+path of `dist/index.js` in the checkout:
 
 ```json
 {
   "mcpServers": {
     "action1": {
-      "command": "npx",
-      "args": ["-y", "action1-mcp-server"],
+      "command": "node",
+      "args": ["/absolute/path/to/action1-mcp/dist/index.js"],
       "env": {
         "ACTION1_BASE_URL": "https://app.eu.action1.com/api/3.0",
         "ACTION1_ORG_ID": "<your-org-uuid>",
@@ -186,11 +173,16 @@ Any other stdio host takes the same command in its JSON configuration:
 ```
 
 A configuration file with these values holds the credential: keep it
-readable for your user only and out of version control.
-`action1-mcp-server@<version>` pins a version. For Claude Desktop the
-MCPB bundle stays the recommended path: its wizard keeps the client ID
-and secret in Claude Desktop's secure storage. More hosts and options:
-[`docs/INSTALLATION.md`](docs/INSTALLATION.md#option-c-npm-npx).
+readable for your user only and out of version control. For Claude
+Desktop the MCPB bundle stays the recommended path: its wizard keeps the
+client ID and secret in Claude Desktop's secure storage. More hosts and
+options:
+[`docs/INSTALLATION.md`](docs/INSTALLATION.md#option-c-other-stdio-hosts).
+
+The upstream npm package `action1-mcp-server`, the `.mcpb` files on
+upstream's GitHub Releases page and upstream's MCP Registry entry are
+not vetted for PSD machines (PSD standard 07-mcp). Install from this
+checkout instead.
 
 ## What is covered
 
@@ -215,7 +207,7 @@ and secret in Claude Desktop's secure storage. More hosts and options:
   `/check-my-permissions`).
 
 `tests/unit/specSha.test.ts` ties the generated tools to the pinned
-snapshot. It does not see changes at Action1; `npm run spec:check` and a
+snapshot. It does not see changes at Action1; `bun run spec:check` and a
 weekly CI job compare the snapshot with the spec Action1 serves.
 
 ## Highlights
@@ -490,21 +482,21 @@ do before an agent tries a destructive operation.
 ## Development
 
 ```bash
-npm run dev               # tsx watch (stdio)
-npm run typecheck         # source
-npm run typecheck:tests   # tests (tsconfig.test.json)
-npm run lint
-npm test                  # all test categories
-npm run test:unit
-npm run test:integration  # MCP protocol round trips
-npm run test:security     # destructive-guard truth table, redaction
-npm run test:performance  # size limits and rendering at scale
-npm run test:coverage     # tests with the coverage thresholds from vitest.config.ts
-npm run test:e2e          # builds the MCPB bundle, starts the built servers over stdio
-npm run check             # lint, both typechecks, format check, tests (what CI gates on)
-npm run codegen           # regenerate src/tools/generated/index.ts from the spec
-npm run spec:check        # compare the pinned spec with the one Action1 serves
-npm run inspector         # MCP Inspector against the built stdio server
+bun run dev               # tsx watch (stdio)
+bun run typecheck         # source
+bun run typecheck:tests   # tests (tsconfig.test.json)
+bun run lint
+bun run test              # all test categories
+bun run test:unit
+bun run test:integration  # MCP protocol round trips
+bun run test:security     # destructive-guard truth table, redaction
+bun run test:performance  # size limits and rendering at scale
+bun run test:coverage     # tests with the coverage thresholds from vitest.config.ts
+bun run test:e2e          # builds the MCPB bundle, starts the built servers over stdio
+bun run check             # lint, both typechecks, format check, tests (what CI gates on)
+bun run codegen           # regenerate src/tools/generated/index.ts from the spec
+bun run spec:check        # compare the pinned spec with the one Action1 serves
+bun run inspector         # MCP Inspector against the built stdio server
 ```
 
 The macOS payload-builder tests are deliberately strict: they protect the
@@ -515,8 +507,6 @@ reverse-engineered field set. If you change the payload, update the test.
 Open candidates (see also
 [`docs/api-coverage-gaps.md`](docs/api-coverage-gaps.md)):
 
-- npm releases with provenance from the release workflow (trusted
-  publisher configured; the first workflow publish is pending).
 - Live validation of the destructive tools listed under
   [Validation status](#validation-status) on a test endpoint.
 - A Cloudflare Workers deployment of the HTTP transport.
@@ -525,7 +515,7 @@ Open candidates (see also
 
 See [`docs/SECURITY.md`](docs/SECURITY.md). Report vulnerabilities through
 a private security advisory at
-<https://github.com/mguttmann/action1-mcp/security/advisories/new>, not in
+<https://github.com/psd401/action1-mcp/security/advisories/new>, not in
 a public issue.
 
 ## License

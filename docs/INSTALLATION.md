@@ -9,10 +9,16 @@ This is an unofficial project, not affiliated with or endorsed by Action1.
 
 | Requirement | Version | Notes |
 |---|---|---|
-| Node.js | 22.12 or newer | `engines` in `package.json`; CI tests 22, 24 and 26. `npm run inspector` needs 22.19 or newer. Not needed for the MCPB bundle in Claude Desktop. |
-| npm | bundled with Node | `npm ci` installs exactly the versions in `package-lock.json`. |
+| Node.js | 22.12 or newer | `engines` in `package.json`; CI tests 22, 24 and 26. The server runs on Node. `bun run inspector` needs 22.19 or newer. |
+| bun | 1.3 or newer | Package manager and script runner for the build. `bun install --frozen-lockfile` installs exactly the versions in `bun.lock`. |
 | An Action1 account | any tier | Cloud or trial. |
 | API credentials | `client_id` + `client_secret` | Issued in *Settings > API Credentials*. See [Getting credentials](#getting-action1-api-credentials). |
+
+Every install path starts from a clone of
+<https://github.com/psd401/action1-mcp>. This fork publishes no npm
+package, GitHub release or registry entry. The upstream npm package
+`action1-mcp-server` and upstream's release downloads are not vetted for
+PSD machines (PSD standard 07-mcp).
 
 ## Getting Action1 API credentials
 
@@ -43,46 +49,31 @@ This is an unofficial project, not affiliated with or endorsed by Action1.
 
 ### Option A: MCPB bundle for Claude Desktop
 
-Download `action1-mcp-<version>.mcpb` from the project's
-[GitHub Releases](https://github.com/mguttmann/action1-mcp/releases) and
-continue with [Claude Desktop](#claude-desktop-macos--windows). No Node.js
-installation is needed.
+Build `dist/action1-mcp-<version>.mcpb` from the checkout and continue
+with [Claude Desktop](#claude-desktop-macos--windows). Claude Desktop
+runs the bundle with its built-in Node.js.
 
 ### Option B: from source (every MCP host)
 
 ```bash
-git clone https://github.com/mguttmann/action1-mcp.git
+git clone https://github.com/psd401/action1-mcp.git
 cd action1-mcp
-npm ci
-npm run build
+bun install --frozen-lockfile
+bun run build
 ```
 
-`npm run build` compiles to `dist/` (TypeScript only; `npm run check`
+`bun run build` compiles to `dist/` (TypeScript only; `bun run check`
 runs lint, typecheck, format check and the tests). `dist/index.js` is the entry point.
 
-### Option C: npm (npx)
+### Option C: other stdio hosts
 
-The package is on npm as
-[`action1-mcp-server`](https://www.npmjs.com/package/action1-mcp-server);
-its command is `action1-mcp`. Install only that exact name: packages with
-similar names are not this project. With `npx` the MCP host fetches and
-starts it, so there is nothing to clone or build:
-
-```bash
-npx -y action1-mcp-server --help         # prints the version and the settings
-npx -y action1-mcp-server@<version> ...  # a pinned version
-```
-
-The settings come from the environment the MCP host passes to the
-process (the `env` block of its configuration, or `-e` for Claude Code);
-see [Claude Code](#claude-code-cli) and
-[generic stdio clients](#continuedev--cody--generic-stdio-clients). Steps
-2 and 3 below are for the source install.
-
-From 0.6.2 on, releases published to npm are also listed in the official
-[MCP Registry](https://registry.modelcontextprotocol.io) as
-`io.github.mguttmann/action1-mcp`, next to the MCPB bundle. Hosts that
-install from the registry ask for the same environment variables.
+Build from source (Option B), then point the MCP host at
+`node /absolute/path/to/action1-mcp/dist/index.js`. The settings come
+from the environment the MCP host passes to the process (the `env` block
+of its configuration, or `-e` for Claude Code). See
+[Claude Code](#claude-code-cli) and
+[generic stdio clients](#continuedev--cody--generic-stdio-clients).
+Steps 2 and 3 below use a `.env` file instead.
 
 ## Step 2: Configure environment (source install)
 
@@ -119,7 +110,7 @@ prints the version and the settings. To open the MCP Inspector against the
 built server (Node 22.19 or newer):
 
 ```bash
-npm run inspector
+bun run inspector
 ```
 
 In the UI, open **Tools** and list them: you should see the `action1_*`
@@ -129,7 +120,7 @@ your organization, the install works.
 One-shot call from the command line:
 
 ```bash
-npx -y @modelcontextprotocol/inspector@2.12.0 --cli \
+bunx @modelcontextprotocol/inspector@2.12.0 --cli \
   node --env-file=.env dist/index.js \
   --method tools/call --tool-name action1_list_organizations
 ```
@@ -138,7 +129,7 @@ npx -y @modelcontextprotocol/inspector@2.12.0 --cli \
 
 ### Claude Code (CLI)
 
-From npm (Option C): `-e` sets each environment variable for the server.
+With the environment in Claude Code's configuration (Option C): `-e` sets each environment variable for the server.
 Type the values in your own shell, never into a chat; Claude Code stores
 them in its configuration (`~/.claude.json` for the local and user
 scopes, `.mcp.json` in the repository for the project scope, so do not
@@ -151,7 +142,7 @@ claude mcp add action1 \
   -e ACTION1_CLIENT_ID=<client-id> \
   -e ACTION1_CLIENT_SECRET=<client-secret> \
   -e ACTION1_ALLOWED_ORG_IDS=<your-org-uuid> \
-  -- npx -y action1-mcp-server
+  -- node /absolute/path/to/action1-mcp/dist/index.js
 ```
 
 From source (Option B), with the `.env` file of Step 2:
@@ -174,15 +165,13 @@ for the settings on install, no `.env` file or config editing needed.
 
 #### Option A: MCPB bundle (recommended)
 
-1. **Get the bundle**: download `action1-mcp-<version>.mcpb` from the
-   [GitHub Releases](https://github.com/mguttmann/action1-mcp/releases),
-   or build it from source:
+1. **Build the bundle** from a clone of this repository:
 
    ```bash
-   git clone https://github.com/mguttmann/action1-mcp.git
+   git clone https://github.com/psd401/action1-mcp.git
    cd action1-mcp
-   npm ci
-   npm run build:mcpb        # writes dist/action1-mcp-<version>.mcpb
+   bun install --frozen-lockfile
+   bun run build:mcpb        # writes dist/action1-mcp-<version>.mcpb
    ```
 
    On Windows, run the build in Git Bash (part of Git for Windows): the
@@ -292,16 +281,16 @@ Restart Cursor; the tools appear in the chat UI.
 
 ### Continue.dev / Cody / generic stdio clients
 
-Any MCP client that speaks stdio works. From npm, the usual JSON
-configuration (`mcpServers` in Claude Desktop, Cursor and most other
-hosts) is:
+Any MCP client that speaks stdio works. With the server built from
+source (Option C), the usual JSON configuration (`mcpServers` in Claude
+Desktop, Cursor and most other hosts) is:
 
 ```json
 {
   "mcpServers": {
     "action1": {
-      "command": "npx",
-      "args": ["-y", "action1-mcp-server"],
+      "command": "node",
+      "args": ["/absolute/path/to/action1-mcp/dist/index.js"],
       "env": {
         "ACTION1_BASE_URL": "https://app.eu.action1.com/api/3.0",
         "ACTION1_ORG_ID": "<your-org-uuid>",
@@ -315,7 +304,8 @@ hosts) is:
 ```
 
 This file then holds the credential: keep it readable for your user
-only and out of version control. From source, the command line is:
+only and out of version control. With the `.env` file of Step 2, the
+command line is:
 
 ```bash
 node --env-file=/abs/path/.env /abs/path/dist/index.js
@@ -348,22 +338,19 @@ organization. If not:
 
 ## Updating
 
-npx keeps a fetched version in its cache. To move an npx setup to the
-newest release, use `action1-mcp-server@latest` in the host's command
-once (or pin `action1-mcp-server@<version>`) and restart the host. For a
-source install:
+Update the checkout and rebuild:
 
 ```bash
 cd action1-mcp
 git pull
-npm ci
-npm run build
+bun install --frozen-lockfile
+bun run build
 ```
 
 Restart your MCP host; the tool list refreshes on the next connect. Read
 the [`CHANGELOG`](../CHANGELOG.md) for changed settings.
 
-Action1 can change its API independently of this project. `npm run
+Action1 can change its API independently of this project. `bun run
 spec:check` compares the pinned spec with the one Action1 serves; the
 tests only check that the committed spec and the generated tools match
 each other. [`CONTRIBUTING.md`](CONTRIBUTING.md#re-running-codegen)
@@ -383,12 +370,12 @@ explains how to adopt a new spec.
 
 ### Do I need to clone the repo, or is there a one-click installer?
 
-1. **MCPB bundle (Claude Desktop only)**: download the `.mcpb` from the
-   GitHub Release and double-click it. No terminal needed.
-2. **npm (`npx -y action1-mcp-server`)**: any stdio host, no clone or
-   build; needs Node.js.
-3. **Clone and build**: to run a version ahead of the latest release, or
-   to change the code.
+Clone this repository in every case. This fork publishes no installer.
+
+1. **MCPB bundle (Claude Desktop only)**: `bun run build:mcpb` in the
+   checkout, then double-click the `.mcpb`.
+2. **Build from source**: any stdio host runs
+   `node /absolute/path/to/action1-mcp/dist/index.js`.
 
 ### Does the server stay running, or does it start per call?
 
@@ -418,7 +405,7 @@ host; register them under different names (`action1-prod`,
 ### How do I check the install worked without a chat?
 
 ```bash
-npx -y @modelcontextprotocol/inspector@2.12.0 --cli \
+bunx @modelcontextprotocol/inspector@2.12.0 --cli \
   node --env-file=.env dist/index.js --method tools/list | jq '.tools | length'
 ```
 

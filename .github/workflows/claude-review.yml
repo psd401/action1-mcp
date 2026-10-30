@@ -1,0 +1,22 @@
+# ABOUTME: Calls PSD401's reusable Claude code review on pull requests. The job grants
+# ABOUTME: id-token: write because the reusable workflow exchanges an OIDC token.
+name: Claude Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+
+jobs:
+  claude-review:
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      id-token: write # reusable's claude-code-action OIDC exchange; caller must grant (org default is read-only)
+    # Dependabot-triggered runs cannot grant the called workflow's
+    # id-token: write permission, which fails the run at startup before the
+    # reusable workflow's own Dependabot guard can evaluate. Skip the call.
+    if: github.actor != 'dependabot[bot]'
+    uses: PSD401/.github/.github/workflows/reusable-claude-review.yml@1aa5f5351a78b15f5c71668037f5d35b9613ae41 # v1.0.0
+    secrets:
+      BEDROCK_API_KEY: ${{ secrets.BEDROCK_API_KEY }}

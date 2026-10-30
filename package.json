@@ -1,17 +1,18 @@
 {
   "name": "action1-mcp-server",
-  "mcpName": "io.github.mguttmann/action1-mcp",
+  "mcpName": "io.github.psd401/action1-mcp",
   "version": "0.6.2",
+  "private": true,
   "description": "Unofficial Model Context Protocol (MCP) server for the Action1 RMM REST API: curated and generated tools over the Action1 OpenAPI spec, a destructive-operation guard, stdio and Streamable HTTP transports, and an MCPB bundle. Not affiliated with Action1.",
   "license": "MIT",
   "author": "mguttmann (https://github.com/mguttmann)",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mguttmann/action1-mcp.git"
+    "url": "git+https://github.com/psd401/action1-mcp.git"
   },
-  "homepage": "https://github.com/mguttmann/action1-mcp#readme",
+  "homepage": "https://github.com/psd401/action1-mcp#readme",
   "bugs": {
-    "url": "https://github.com/mguttmann/action1-mcp/issues"
+    "url": "https://github.com/psd401/action1-mcp/issues"
   },
   "type": "module",
   "bin": {
@@ -28,14 +29,10 @@
     "NOTICE",
     "CHANGELOG.md"
   ],
-  "publishConfig": {
-    "access": "public",
-    "provenance": true
-  },
   "scripts": {
     "build": "tsc",
     "build:mcpb": "bash scripts/build-mcpb.sh",
-    "prepack": "npm run clean && npm run build",
+    "prepack": "bun run clean && bun run build",
     "codegen": "tsx src/codegen/generate.ts",
     "spec:fetch": "node scripts/fetch-spec.mjs --fetch",
     "spec:check": "node scripts/fetch-spec.mjs --check",
@@ -55,11 +52,11 @@
     "test:security": "vitest run tests/security",
     "test:performance": "vitest run tests/performance",
     "test:watch": "vitest",
-    "inspector": "npx -y @modelcontextprotocol/inspector@2.12.0 node --env-file=.env dist/index.js",
+    "inspector": "bunx @modelcontextprotocol/inspector@2.12.0 node --env-file=.env dist/index.js",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
-    "check": "npm run lint && npm run typecheck && npm run typecheck:tests && npm run format:check && npm test"
+    "check": "bun run lint && bun run typecheck && bun run typecheck:tests && bun run format:check && bun run test"
   },
   "keywords": [
     "mcp",
@@ -99,5 +96,10 @@
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.72.1",
     "vitest": "^5.0.5"
+  },
+  "overrides": {
+    "tmp": "^0.2.7",
+    "node-forge": "^1.4.2",
+    "zod": "^4.6.7"
   }
 }

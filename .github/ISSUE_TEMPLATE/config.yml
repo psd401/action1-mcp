@@ -1,7 +1,7 @@
 blank_issues_enabled: false
 contact_links:
   - name: Report a security vulnerability
-    url: https://github.com/mguttmann/action1-mcp/security/advisories/new
+    url: https://github.com/psd401/action1-mcp/security/advisories/new
     about: Report vulnerabilities privately. Do not open a public issue.
   - name: Action1 product support
     url: https://www.action1.com/

@@ -61,7 +61,7 @@ describe("spec contract of the curated tools", () => {
     expect(missing).toEqual([]);
   });
 
-  it("src/spec/generated.ts matches the spec (run npm run codegen after a spec change)", () => {
+  it("src/spec/generated.ts matches the spec (run bun run codegen after a spec change)", () => {
     const fresh = resolveContract(SPEC);
     expect(SPEC_ENUMS).toEqual(fresh.enums);
     expect(SPEC_FIELDS).toEqual(fresh.fields);

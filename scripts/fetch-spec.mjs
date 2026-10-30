@@ -26,7 +26,7 @@
 //       src/codegen/spec/known-undocumented-endpoints.json.
 //   --url <swagger-ui-url>   override the Swagger UI URL (default EU instance)
 //
-// npm scripts: `npm run spec:fetch`, `npm run spec:check`.
+// package.json scripts: `bun run spec:fetch`, `bun run spec:check`.
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -232,7 +232,7 @@ async function main(argv) {
   process.stdout.write(`spec: DRIFT, pinned ${pinnedSha} but live is ${live.sha}\n`);
   process.stdout.write(diffSummary(pinnedSpec, liveSpec) + "\n");
   process.stdout.write(
-    "Refresh: npm run spec:fetch, review the candidate, then follow src/codegen/spec/SOURCE.md.\n",
+    "Refresh: bun run spec:fetch, review the candidate, then follow src/codegen/spec/SOURCE.md.\n",
   );
   return 1;
 }
