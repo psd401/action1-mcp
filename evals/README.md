@@ -35,10 +35,7 @@ an Anthropic API key, and it costs API usage.
 ```bash
 python scripts/evaluation.py \
   -t stdio -c node -a dist/index.js \
-  -e ACTION1_BASE_URL=https://app.eu.action1.com/api/3.0 \
-  -e ACTION1_ORG_ID=<your-org-uuid> \
-  -e ACTION1_CLIENT_ID=<your-client-id> \
-  -e ACTION1_CLIENT_SECRET=<your-client-secret> \
+  -e ACTION1_KEYCHAIN=true \
   -o eval-report.md \
   evals/action1-eval.xml
 ```

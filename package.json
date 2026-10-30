@@ -52,7 +52,7 @@
     "test:security": "vitest run tests/security",
     "test:performance": "vitest run tests/performance",
     "test:watch": "vitest",
-    "inspector": "bunx @modelcontextprotocol/inspector@2.12.0 node --env-file=.env dist/index.js",
+    "inspector": "bunx @modelcontextprotocol/inspector@2.12.0 -e ACTION1_KEYCHAIN=true node dist/index.js",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",

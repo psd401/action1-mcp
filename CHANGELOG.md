@@ -40,6 +40,18 @@ with bun and publishes nothing.
 - PSD401 reusable workflows: `psd-ci`, `security-scan`, `claude-review`
   and `license-check`. They get a read-only token and no repository
   secrets, except `claude-review`, which gets `BEDROCK_API_KEY`.
+- **Credentials from the macOS Keychain.** With `ACTION1_KEYCHAIN=true`,
+  the server reads `ACTION1_BASE_URL`, `ACTION1_ORG_ID`,
+  `ACTION1_CLIENT_ID`, `ACTION1_CLIENT_SECRET` and `MCP_HTTP_TOKEN` from
+  the Keychain when the environment leaves them unset. Each item's
+  service is the variable name and its account is the login user.
+  `scripts/keychain-store.sh` stores them from hidden terminal prompts.
+  The flag is off by default and is a config error outside macOS.
+- `bun run inspector`, `scripts/inspector-smoke.sh` and
+  `scripts/live-shape-check.mjs` read the credential from the Keychain
+  instead of a `.env` file. The docs drop `.env` files for secrets:
+  laptops use the Keychain or the MCPB wizard, Linux services use a
+  root-owned mode-0600 environment file outside the checkout.
 
 ### Removed
 

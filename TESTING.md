@@ -28,7 +28,7 @@ Six layers:
    SHA-256 for the bundle. Not part of `bun run test`: it needs registry
    access for `bun install --frozen-lockfile`.
 6. **Live smoke tests** (manual): exercise a real Action1 tenant with a
-   populated `.env`. Not in CI. The read-only
+   credential in the macOS Keychain (`scripts/keychain-store.sh`). Not in CI. The read-only
    [live shape check](#live-shape-check-owner-only) belongs here too.
 
 Coverage: `bun run test:coverage` (CI job `coverage`) fails when line,
@@ -110,7 +110,8 @@ bun run build
 ./scripts/inspector-smoke.sh   # exits 0 if every tool's schema is healthy
 ```
 
-It needs a populated `.env` and takes about a minute.
+It reads the credential from the macOS Keychain (store it once with
+`scripts/keychain-store.sh`) and takes about a minute.
 
 ## Live shape check (owner only)
 
@@ -123,7 +124,7 @@ under `fields.Name`, the `Warning` automation status) is checked by
 `scripts/live-shape-check.mjs` (results of the first check below):
 
 ```bash
-node --env-file=.env scripts/live-shape-check.mjs [--out live-shape-report.json]
+ACTION1_KEYCHAIN=true node scripts/live-shape-check.mjs [--out live-shape-report.json]
 # or, with ACTION1_* exported in the shell:
 bun run live:shapes
 ```

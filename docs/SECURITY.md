@@ -42,7 +42,7 @@ you prefer not to be.
 | Instructions hidden in Action1 data (indirect prompt injection) | Hostnames, software names, script output or audit texts contain text that makes the model call a destructive tool | The model sets `confirm` and `dry_run` itself, so they do not help here. What holds: `ACTION1_ALLOW_DESTRUCTIVE` and `ACTION1_ALLOW_ACCOUNT_OPS` (server env), `ACTION1_ALLOWED_ORG_IDS`, `ACTION1_TOOLSETS=read`, the Action1 role of the credential, and the MCP host's per-tool approval. The server instructions tell the model to treat Action1 data as data. |
 | Model mistake | Unintended destructive call | `dry_run` defaults to `true` (preview only), `confirm: "YES"` is required, the env switch is off by default. |
 | Network attacker, malicious web page (DNS rebinding) | Reach or hijack the HTTP transport | Bearer token required for `--http`; `Host` and `Origin` are checked on every request; TLS at a reverse proxy; bind to loopback behind the proxy. |
-| Credential exposure | Client secret ends up in chat transcripts, logs or the repo | The agent setup guide (`CLAUDE.md`) never asks for credentials in chat; the MCPB wizard stores them; logs and error texts are redacted; `.env` is git-ignored. |
+| Credential exposure | Client secret ends up in chat transcripts, logs or the repo | The agent setup guide (`CLAUDE.md`) never asks for credentials in chat; the MCPB wizard stores them; logs and error texts are redacted; credentials live in the macOS Keychain on laptops and in a root-owned file outside the checkout on servers; a stray `.env` is git-ignored. |
 | Operator misconfiguration | Public bind without auth, typos in switches | The HTTP transport refuses to start without a token (or on a wildcard bind without `MCP_HTTP_ALLOWED_HOSTS`); invalid switch values abort startup; production checklist in [`DEPLOYMENT.md`](DEPLOYMENT.md). |
 | Supply-chain compromise | Token or payload theft through a dependency | Few runtime dependencies, lockfile, CI fails on high or critical advisories in runtime dependencies, Dependabot updates, secret scanning config for the repo. |
 | Look-alike packages | Someone publishes a package with a similar name | This fork publishes no package. Install only from a checkout of `psd401/action1-mcp`; the upstream npm package `action1-mcp-server` is not vetted for PSD machines (PSD standard 07-mcp). |
@@ -319,7 +319,10 @@ protocol.
 
 ## Repository hygiene
 
-1. `.env` is in `.gitignore`. Never commit it; `git check-ignore .env`
+1. No secret goes in a `.env` file. Laptops keep the credentials in the
+   macOS Keychain (`ACTION1_KEYCHAIN=true`). Servers keep them in
+   `/etc/action1-mcp/env` (see [`DEPLOYMENT.md`](DEPLOYMENT.md#systemd-unit)).
+   `.env` stays in `.gitignore` as a safety net: `git check-ignore .env`
    should print the matching rule.
 2. `.gitleaks.toml` and `.github/secret_scanning.yml` configure secret
    scanning. They exclude the vendored spec (it contains Action1's own

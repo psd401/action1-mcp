@@ -197,9 +197,10 @@ Extensions. Stored settings carry over; the wizard does not ask again.
   the upstream package `action1-mcp-server`, and do not download
   upstream's release `.mcpb` files. Build from this checkout. For hosts
   other than Claude Desktop, `docs/INSTALLATION.md` (Option C) runs
-  `node /absolute/path/to/action1-mcp/dist/index.js`; there, too, the
-  user types the credentials into their own shell or config file, never
-  into the chat.
+  `node /absolute/path/to/action1-mcp/dist/index.js`. There, the user
+  stores the credentials with `scripts/keychain-store.sh` in their own
+  terminal, never in the chat, and the host config sets
+  `ACTION1_KEYCHAIN=true`.
 
 ---
 

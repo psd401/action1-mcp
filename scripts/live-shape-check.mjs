@@ -27,7 +27,8 @@
 // stay in memory and are never written.
 //
 // Usage (owner only, with real credentials; nothing in CI runs this):
-//   node --env-file=.env scripts/live-shape-check.mjs [--out <file>]
+//   bun run build && ACTION1_KEYCHAIN=true bun run live:shapes [--out <file>]
+//     (macOS: reads unset ACTION1_* from the Keychain via dist/keychain.js)
 //   bun run live:shapes            (when ACTION1_* are already exported)
 // Env: ACTION1_BASE_URL, ACTION1_CLIENT_ID, ACTION1_CLIENT_SECRET,
 //      ACTION1_ORG_ID (the org to read from).
@@ -362,7 +363,38 @@ function itemsOf(body, single) {
   return [];
 }
 
-export async function run({ out = DEFAULT_OUT, env = process.env } = {}) {
+const KEYCHAIN_SETTINGS = [
+  "ACTION1_BASE_URL",
+  "ACTION1_CLIENT_ID",
+  "ACTION1_CLIENT_SECRET",
+  "ACTION1_ORG_ID",
+];
+
+/**
+ * With ACTION1_KEYCHAIN=true, a copy of `env` with each unset setting
+ * read from the macOS Keychain the way the server reads it.
+ */
+async function withKeychain(env, readKeychain) {
+  if (!/^(true|1|yes)$/i.test((env.ACTION1_KEYCHAIN ?? "").trim())) return env;
+  let read = readKeychain;
+  if (!read) {
+    try {
+      read = (await import("../dist/keychain.js")).readKeychainItem;
+    } catch {
+      throw new Error("ACTION1_KEYCHAIN needs dist/keychain.js. Run `bun run build` first.");
+    }
+  }
+  const filled = { ...env };
+  for (const key of KEYCHAIN_SETTINGS) {
+    if ((filled[key] ?? "").trim()) continue;
+    const value = read(key);
+    if (value) filled[key] = value;
+  }
+  return filled;
+}
+
+export async function run({ out = DEFAULT_OUT, env: rawEnv = process.env, readKeychain } = {}) {
+  const env = await withKeychain(rawEnv, readKeychain);
   const cfg = {
     baseUrl: (env.ACTION1_BASE_URL ?? "").replace(/\/+$/, ""),
     clientId: env.ACTION1_CLIENT_ID ?? "",

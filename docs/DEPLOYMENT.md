@@ -15,8 +15,9 @@ install the **MCPB bundle**. Pick the section that matches your setup.
 ## stdio (local)
 
 Each user clones and builds this repository and points their MCP host
-at `node /absolute/path/to/action1-mcp/dist/index.js` (settings in
-the host's `env` block or a `.env` file). See
+at `node /absolute/path/to/action1-mcp/dist/index.js`. On macOS the
+credentials come from the Keychain (`ACTION1_KEYCHAIN=true`). Other
+settings go in the host's `env` block. See
 [`INSTALLATION.md`](INSTALLATION.md).
 
 ## Streamable HTTP (hosted)
@@ -35,22 +36,30 @@ bun install --frozen-lockfile
 bun run build
 rm -rf node_modules                # drop the build and test tooling
 bun install --frozen-lockfile --production --ignore-scripts
-cp .env.example .env
-chmod 600 .env
+
+# Settings live outside the checkout, in a file only root can read
+sudo install -d -m 700 /etc/action1-mcp
+sudo install -m 600 -o root -g root .env.example /etc/action1-mcp/env
+sudoedit /etc/action1-mcp/env
 # Fill in ACTION1_BASE_URL, ACTION1_CLIENT_ID, ACTION1_CLIENT_SECRET,
-# ACTION1_ORG_ID and ACTION1_ALLOWED_ORG_IDS in .env.
+# ACTION1_ORG_ID and ACTION1_ALLOWED_ORG_IDS.
 
 # Generate the shared secret for the MCP endpoint (GNU sed)
-sed -i "s/^MCP_HTTP_TOKEN=.*/MCP_HTTP_TOKEN=$(openssl rand -hex 32)/" .env
-
-node --env-file=.env dist/index.js --http --host 127.0.0.1 --port 3000
+# (piped, so the token never appears in a command line)
+sudo sed -i '/^MCP_HTTP_TOKEN=/d' /etc/action1-mcp/env
+{ printf 'MCP_HTTP_TOKEN='; openssl rand -hex 32; } | sudo tee -a /etc/action1-mcp/env >/dev/null
 ```
 
 `bun install --production` on top of a full install keeps the dev
 packages, so the steps delete `node_modules` and install the runtime
 tree fresh. The CI job `deploy-path` runs the same steps.
 
-Check it from the same machine:
+Nothing secret goes inside `/opt/action1-mcp` or any other git checkout.
+Mirror the values of `/etc/action1-mcp/env` to Bitwarden, so a rebuilt
+host can be restored.
+
+Start the server with the [systemd unit](#systemd-unit) below. Check it
+from the same machine:
 
 ```bash
 curl -s http://127.0.0.1:3000/healthz
@@ -93,7 +102,7 @@ mcp.example.com {
 }
 ```
 
-Add to `.env`:
+Add to `/etc/action1-mcp/env` with `sudoedit`, then restart the service:
 
 ```dotenv
 # The name clients use. Caddy forwards the original Host header.
@@ -123,12 +132,9 @@ another remote client with:
 
 ### systemd unit
 
-Keep the settings in a root-owned file that only systemd reads:
-
-```bash
-sudo install -d -m 700 /etc/action1-mcp
-sudo install -m 600 -o root -g root /opt/action1-mcp/.env /etc/action1-mcp/env
-```
+systemd reads `/etc/action1-mcp/env` (created in
+[Bare metal / VM](#bare-metal--vm)) as root and passes the values to the
+service. The service user cannot read the file.
 
 `EnvironmentFile` takes plain `KEY=value` lines. Comments must be on their
 own line (a `#` after a value becomes part of the value), and values are
@@ -240,8 +246,8 @@ token checks.
 Before a shared deployment goes live:
 
 - [ ] `ACTION1_BASE_URL`, `ACTION1_CLIENT_ID`, `ACTION1_CLIENT_SECRET`,
-  `ACTION1_ORG_ID` come from a secret store or a root-only file
-  (`chmod 600`), never from a repository.
+  `ACTION1_ORG_ID` come from `/etc/action1-mcp/env` (root-owned, mode
+  0600, outside the checkout), never from a repository.
 - [ ] The Action1 credential's role has only the permissions the tools
   need ([`permissions.md`](permissions.md)).
 - [ ] `ACTION1_ALLOWED_ORG_IDS` lists the organizations this deployment
@@ -267,8 +273,8 @@ Before a shared deployment goes live:
 - [ ] The API credential is rotated on a schedule (90 days is a
   reasonable default): issue a new one, update the configuration,
   restart, revoke the old one.
-- [ ] The configuration file is backed up (the credentials are the only
-  state).
+- [ ] The values in `/etc/action1-mcp/env` are mirrored to Bitwarden
+  (the credentials are the only state).
 
 ## Updating
 
@@ -300,10 +306,12 @@ restart.
 
 The server writes structured JSON lines to **stderr** with credential
 redaction; stdout carries only MCP JSON-RPC. Under systemd, stderr goes
-to journald. Elsewhere, pipe it to your log collector:
+to journald (`journalctl -u action1-mcp`). To also write a file, add
+this to the unit (systemd 240 or newer):
 
-```bash
-node --env-file=.env dist/index.js --http 2>> /var/log/action1-mcp/server.log
+```ini
+[Service]
+StandardError=append:/var/log/action1-mcp/server.log
 ```
 
 The event list with fields is in

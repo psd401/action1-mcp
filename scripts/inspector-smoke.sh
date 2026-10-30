@@ -17,8 +17,9 @@
 #   ./scripts/inspector-smoke.sh
 #
 # Requires:
-#   - `.env` with valid ACTION1_BASE_URL / ACTION1_CLIENT_ID /
-#     ACTION1_CLIENT_SECRET / ACTION1_ORG_ID
+#   - macOS, with ACTION1_BASE_URL / ACTION1_CLIENT_ID /
+#     ACTION1_CLIENT_SECRET / ACTION1_ORG_ID in the login Keychain
+#     (store them with scripts/keychain-store.sh)
 #   - `dist/index.js` (run `bun run build` first)
 #
 # Exit codes:
@@ -34,8 +35,9 @@ if [ ! -f "dist/index.js" ]; then
   echo "dist/index.js missing. Run 'bun run build' first." >&2
   exit 2
 fi
-if [ ! -f ".env" ]; then
-  echo ".env missing. Inspector needs real Action1 credentials." >&2
+# Probe for the secret with find-generic-password without -w, so the value is never printed.
+if ! /usr/bin/security find-generic-password -s ACTION1_CLIENT_SECRET -a "${USER:-$(id -un)}" >/dev/null 2>&1; then
+  echo "ACTION1_CLIENT_SECRET missing from the Keychain. Run scripts/keychain-store.sh first." >&2
   exit 2
 fi
 
@@ -79,7 +81,7 @@ for spec in "${TOOLS[@]}"; do
   for p in "${parts[@]:1}"; do
     args+=("--tool-arg" "$p")
   done
-  result=$(bunx @modelcontextprotocol/inspector@2.12.0 --cli node --env-file=.env dist/index.js \
+  result=$(bunx @modelcontextprotocol/inspector@2.12.0 --cli -e ACTION1_KEYCHAIN=true node dist/index.js \
     --method tools/call --tool-name "$name" "${args[@]}" 2>&1)
   if echo "$result" | grep -qE 'Output validation error|Structured content does not match'; then
     echo "[SCHEMA-FAIL] $name"

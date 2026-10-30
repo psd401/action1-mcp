@@ -1,4 +1,10 @@
 import { z } from "zod";
+import {
+  KEYCHAIN_KEYS,
+  KeychainError,
+  readKeychainItem,
+  type KeychainOptions,
+} from "./keychain.js";
 import { currentRequestContext } from "./utils/requestContext.js";
 
 const LOG_LEVELS = [
@@ -192,6 +198,7 @@ const EnvSchema = z.object({
     )
     .transform((sets) => sets as Toolset[]),
   ACTION1_REDACT_PII: flagEnv("ACTION1_REDACT_PII"),
+  ACTION1_KEYCHAIN: flagEnv("ACTION1_KEYCHAIN"),
   PORT: z
     .string()
     .optional()
@@ -308,6 +315,11 @@ export const ENV_VARS: Record<EnvKey, { group: EnvVarGroup; summary: string }> =
     summary:
       "Mask user names, IPs, MACs, addresses, serials, e-mail addresses and AD fields in tool output: true/1/yes (default off)",
   },
+  ACTION1_KEYCHAIN: {
+    group: "optional",
+    summary:
+      "macOS: read unset connection keys and MCP_HTTP_TOKEN from the login Keychain: true/1/yes (default off)",
+  },
   ACTION1_REQUEST_TIMEOUT_MS: {
     group: "optional",
     summary: "Budget for one Action1 API call incl. retries, ms, 1000..600000 (default 60000)",
@@ -384,7 +396,8 @@ export interface AppConfig {
 
 let cached: AppConfig | undefined;
 
-const CONFIG_HINT = "See .env.example for the required keys; empty values count as unset.";
+const CONFIG_HINT =
+  "See .env.example for the required keys, or docs/INSTALLATION.md to keep them in the macOS Keychain. Empty values count as unset.";
 
 /**
  * Invalid or missing settings. `issues` holds one self-contained line
@@ -405,8 +418,11 @@ export class ConfigError extends Error {
 }
 
 /** One issue line: "KEY is not set." or "KEY is invalid: <rule>". */
-function issueLine(key: string, message: string, present: boolean): string {
+function issueLine(key: string, message: string, present: boolean, keychain: boolean): string {
   if (key === "") return message;
+  if (!present && keychain && (KEYCHAIN_KEYS as readonly string[]).includes(key)) {
+    return `${key} is not set in the environment or the macOS Keychain.`;
+  }
   if (!present) return `${key} is not set.`;
   const rule = message.startsWith(`${key} `) ? message.slice(key.length + 1) : message;
   return `${key} is invalid: ${rule}`;
@@ -430,23 +446,59 @@ function readEnv(source: NodeJS.ProcessEnv): Record<string, string> {
 }
 
 /**
+ * With ACTION1_KEYCHAIN on, copy each KEYCHAIN_KEYS entry the
+ * environment leaves unset from the macOS Keychain into `raw`. Returns
+ * whether the lookup ran, plus one issue per failed lookup. An invalid
+ * flag value is left for the schema to report.
+ */
+function fillFromKeychain(
+  raw: Record<string, string>,
+  options: KeychainOptions,
+): { used: boolean; issues: string[] } {
+  if (!parseFlag(raw.ACTION1_KEYCHAIN)) return { used: false, issues: [] };
+  if ((options.platform ?? process.platform) !== "darwin") {
+    return {
+      used: false,
+      issues: ["ACTION1_KEYCHAIN is invalid: the macOS Keychain is only available on macOS."],
+    };
+  }
+  const issues: string[] = [];
+  for (const key of KEYCHAIN_KEYS) {
+    if (key in raw) continue;
+    try {
+      const value = readKeychainItem(key, options)?.trim();
+      if (value) raw[key] = value;
+    } catch (err) {
+      if (!(err instanceof KeychainError)) throw err;
+      // A locked or prompting Keychain fails every key the same way: stop after one timeout.
+      issues.push(err.message);
+      break;
+    }
+  }
+  return { used: true, issues };
+}
+
+/**
  * Parse and validate the process environment once and cache the result.
  * Every reader of an ACTION1_* or HTTP setting goes through this
  * function, so all of them see the same trimmed, case-folded values.
  * Throws an Error listing every invalid or missing key; callers at
- * startup let it end the process.
+ * startup let it end the process. `options.keychain` points the
+ * Keychain lookup at a test keychain or binary.
  */
-export function loadConfig(): AppConfig {
+export function loadConfig(options: { keychain?: KeychainOptions } = {}): AppConfig {
   if (cached) return cached;
   const raw = readEnv(process.env);
+  const keychain = fillFromKeychain(raw, options.keychain ?? {});
   const parsed = EnvSchema.safeParse(raw);
-  if (!parsed.success) {
-    throw new ConfigError(
-      parsed.error.issues.map((i) => {
+  if (!parsed.success || keychain.issues.length > 0) {
+    throw new ConfigError([
+      ...keychain.issues,
+      ...(parsed.error?.issues ?? []).map((i) => {
         const key = i.path.join(".");
-        return issueLine(key, i.message, key in raw);
+        return issueLine(key, i.message, key in raw, keychain.used);
       }),
-    );
+    ]);
   }
   const env = parsed.data;
   const allowedOrgIds = env.ACTION1_ALLOWED_ORG_IDS;
