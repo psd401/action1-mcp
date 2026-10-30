@@ -173,6 +173,7 @@ describe("workflow hygiene", () => {
       "ci.yml",
       "claude-review.yml",
       "license-check.yml",
+      "openwiki-update.yml",
       "psd-ci.yml",
       "security-scan.yml",
       "spec-drift.yml",
