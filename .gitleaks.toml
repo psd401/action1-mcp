@@ -1,16 +1,34 @@
-# gitleaks configuration: the default rule set plus documented false-positive
-# exclusions. Run: gitleaks git . (history) or gitleaks dir . (working tree).
+# gitleaks configuration: the default rule set, the PSD401 student-account
+# rule, and documented false-positive exclusions. Run: gitleaks git . (history)
+# or gitleaks dir . (working tree). The PSD401 security scan reads this file in
+# place of its org rules and runs gitleaks 8.24.0, which ignores [[allowlists]]
+# tables, so the exclusions use the single [allowlist] table.
 [extend]
 useDefault = true
 
-[[allowlists]]
-description = "Vendor example values (client IDs, client_secret, tokens, passwords) in the vendored Action1 OpenAPI spec; see src/codegen/spec/SOURCE.md"
-paths = ['''^src/codegen/spec/openapi\.json$''']
+# From PSD401/.github reusable-security-scan.yml (org rule since 2026-10-09).
+[[rules]]
+id = "psd-student-numeric-email"
+description = "A student Google account: digit-only local part @edtools.psd401.net (the student number). Use a synthetic id (1000xxx) instead."
+regex = '''\b([0-9]{4,10})@edtools\.psd401\.net\b'''
+secretGroup = 1
+tags = ["student-pii"]
 
-[[allowlists]]
-description = "Deliberate fake secrets in the redaction and config tests: a JWT with payload {\"sub\":\"test-user\"} and signature 'signaturesignaturesignature', and hex placeholders starting with abcdef0123 or abcdef1234. Matched by value, so reformatting a test does not reopen a finding."
-condition = "AND"
-paths = ['''^tests/''']
+[[rules.allowlists]]
+description = "Synthetic student ids (1000xxx), the documented replacement"
+regexTarget = "match"
+regexes = ['''\b1000[0-9]{3}@edtools\.psd401\.net\b''']
+
+# A finding is skipped when its file matches a path OR its match matches a regex.
+# Path: vendor example values (client IDs, client_secret, tokens, passwords) in
+# the vendored Action1 OpenAPI spec; see src/codegen/spec/SOURCE.md.
+# Regexes: deliberate fake secrets in the redaction and config tests: a JWT with
+# payload {"sub":"test-user"} and signature 'signaturesignaturesignature', and
+# hex placeholders starting with abcdef0123 or abcdef1234. Matched by value, so
+# reformatting a test does not reopen a finding.
+[allowlist]
+description = "Vendored spec examples and the fake test secrets"
+paths = ['''^src/codegen/spec/openapi\.json$''']
 regexTarget = "match"
 regexes = [
   '''eyJhbGciOiJIUzI1NiJ9\.eyJzdWIiOiJ0ZXN0LXVzZXIifQ\.signaturesignaturesignature''',

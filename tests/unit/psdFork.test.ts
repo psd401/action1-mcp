@@ -97,6 +97,22 @@ describe("OIDC", () => {
   });
 });
 
+describe(".gitleaks.toml", () => {
+  // The PSD401 security scan uses a repo's own .gitleaks.toml in place of the
+  // org rules, and runs gitleaks 8.24.0, which ignores [[allowlists]] tables.
+  const config = read(".gitleaks.toml");
+
+  it("carries the PSD401 student-account rule and its synthetic-id allowlist", () => {
+    expect(config).toContain('id = "psd-student-numeric-email"');
+    expect(config).toContain("'''\\b([0-9]{4,10})@edtools\\.psd401\\.net\\b'''");
+    expect(config).toContain("'''\\b1000[0-9]{3}@edtools\\.psd401\\.net\\b'''");
+  });
+
+  it("uses only allowlist tables that gitleaks 8.24 reads", () => {
+    expect(config).not.toMatch(/^\[\[allowlists\]\]/m);
+  });
+});
+
 describe("PSD401 reusable CI", () => {
   it.each([
     ["psd-ci.yml", "psd-ci", "reusable-psd-ci.yml"],
