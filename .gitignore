@@ -38,3 +38,4 @@ src/codegen/spec/openapi.candidate.json
 
 # Report written by `bun run live:shapes` (scripts/live-shape-check.mjs)
 live-shape-report.json
+.openwiki/
