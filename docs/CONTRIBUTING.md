@@ -330,7 +330,7 @@ synthetic placeholder. `.env` is git-ignored - keep it that way.
   through the agent, not the API endpoint you want wrapped. We add
   endpoints when they unblock workflows.
 - **Security report**: use the
-  [private security advisory](https://github.com/mguttmann/action1-mcp/security/advisories/new),
+  [private security advisory](https://github.com/psd401/action1-mcp/security/advisories/new),
   not a public issue.
 
 ## Versions

@@ -515,7 +515,7 @@ Open candidates (see also
 
 See [`docs/SECURITY.md`](docs/SECURITY.md). Report vulnerabilities through
 a private security advisory at
-<https://github.com/mguttmann/action1-mcp/security/advisories/new>, not in
+<https://github.com/psd401/action1-mcp/security/advisories/new>, not in
 a public issue.
 
 ## License

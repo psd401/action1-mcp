@@ -210,7 +210,7 @@ Extensions. Stored settings carry over; the wizard does not ask again.
 2. Check [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md).
 3. If still stuck: tell the user, share the redacted error, and ask
    whether to open an issue at
-   <https://github.com/mguttmann/action1-mcp/issues>.
+   <https://github.com/psd401/action1-mcp/issues>.
 
 ---
 

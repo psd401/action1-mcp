@@ -16,7 +16,7 @@ comment:
 
 - Open a private report through GitHub's private vulnerability
   reporting at
-  <https://github.com/mguttmann/action1-mcp/security/advisories/new> and
+  <https://github.com/psd401/action1-mcp/security/advisories/new> and
   start the title with "Conduct:". Only the maintainer sees it. If that
   page is not available to you, use the contact options on the
   maintainer's GitHub profile,

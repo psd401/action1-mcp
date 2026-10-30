@@ -19,7 +19,7 @@ Only the latest minor release receives fixes.
 ## Reporting a vulnerability
 
 Report vulnerabilities privately through a GitHub security advisory:
-<https://github.com/mguttmann/action1-mcp/security/advisories/new>. Do not
+<https://github.com/psd401/action1-mcp/security/advisories/new>. Do not
 open a public issue. If that page is not available to you, open an issue
 that only asks for a private contact, without details.
 

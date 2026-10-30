@@ -316,9 +316,9 @@ More failure modes in [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md).
 ## Anything else?
 
 - **Open an issue**:
-  <https://github.com/mguttmann/action1-mcp/issues>
+  <https://github.com/psd401/action1-mcp/issues>
 - **Security advisory**:
-  <https://github.com/mguttmann/action1-mcp/security/advisories/new>
+  <https://github.com/psd401/action1-mcp/security/advisories/new>
 - **Read the docs**:
   - [`INSTALLATION.md`](INSTALLATION.md) - set up
   - [`USAGE.md`](USAGE.md) - tool reference

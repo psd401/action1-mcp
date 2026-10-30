@@ -13,4 +13,4 @@
 - [ ] If the code generator, the spec pin or curated tool names changed: `bun run codegen` was run and `src/tools/generated/index.ts` is part of this PR.
 - [ ] Docs updated where behaviour, configuration or tool names changed (README, `docs/`, `.env.example`).
 - [ ] No credentials, tokens or customer identifiers (org or endpoint UUIDs, hostnames, user names) in code, tests, fixtures or this description.
-- [ ] I have read [CONTRIBUTING](https://github.com/mguttmann/action1-mcp/blob/main/docs/CONTRIBUTING.md) and agree that my contribution is licensed under the MIT License.
+- [ ] I have read [CONTRIBUTING](https://github.com/psd401/action1-mcp/blob/main/docs/CONTRIBUTING.md) and agree that my contribution is licensed under the MIT License.

@@ -338,7 +338,7 @@ when the file changed and why. Re-pin only after a deliberate review.
 ## Still stuck
 
 - Search the issue tracker:
-  <https://github.com/mguttmann/action1-mcp/issues>
+  <https://github.com/psd401/action1-mcp/issues>
 - Open a new issue with: server version (`node dist/index.js --version`,
   or the commit SHA), Node version
   (`node --version`), MCP host and version, the exact command you ran,
