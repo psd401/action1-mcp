@@ -35,7 +35,7 @@
   "scripts": {
     "build": "tsc",
     "build:mcpb": "bash scripts/build-mcpb.sh",
-    "prepack": "npm run clean && npm run build",
+    "prepack": "bun run clean && bun run build",
     "codegen": "tsx src/codegen/generate.ts",
     "spec:fetch": "node scripts/fetch-spec.mjs --fetch",
     "spec:check": "node scripts/fetch-spec.mjs --check",
@@ -55,11 +55,11 @@
     "test:security": "vitest run tests/security",
     "test:performance": "vitest run tests/performance",
     "test:watch": "vitest",
-    "inspector": "npx -y @modelcontextprotocol/inspector@2.12.0 node --env-file=.env dist/index.js",
+    "inspector": "bunx @modelcontextprotocol/inspector@2.12.0 node dist/index.js",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
-    "check": "npm run lint && npm run typecheck && npm run typecheck:tests && npm run format:check && npm test"
+    "check": "bun run lint && bun run typecheck && bun run typecheck:tests && bun run format:check && bun run test"
   },
   "keywords": [
     "mcp",
