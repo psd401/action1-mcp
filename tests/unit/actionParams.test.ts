@@ -252,4 +252,10 @@ describe("orgIdFromActionPath", () => {
     expect(orgIdFromActionPath(`/automations/schedules/${ORG}/abc`)).toBe(ORG);
     expect(orgIdFromActionPath(`/endpoints/managed/${ORG}`)).toBeUndefined();
   });
+
+  it("matches percent-encoded and mixed-case spellings of the action paths", () => {
+    expect(orgIdFromActionPath(`/%61utomations/instances/${ORG}`)).toBe(ORG);
+    expect(orgIdFromActionPath(`/Automations/Instances/${ORG}`)).toBe(ORG);
+    expect(orgIdFromActionPath(`/POLICIES/instances/${ORG}?x=1`)).toBe(ORG);
+  });
 });

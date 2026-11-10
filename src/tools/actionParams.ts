@@ -16,12 +16,30 @@ export class ActionParamsError extends Error {
   }
 }
 
-const ACTION_PATH = /^\/(?:automations|policies)\/(?:instances|schedules)\/([^/?]+)/;
+const ACTION_KINDS = new Set(["automations", "policies"]);
+const ACTION_COLLECTIONS = new Set(["instances", "schedules"]);
 
-/** Org id of an action create or update path, undefined for any other path. */
+function decodeSegment(segment: string): string {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
+}
+
+/**
+ * Org id of an action create or update path, undefined for any other path.
+ * Segments are compared decoded and case-insensitively, so a free-form
+ * raw_request path cannot skip the check by spelling (`/%61utomations/...`).
+ */
 export function orgIdFromActionPath(path: string): string | undefined {
-  const m = ACTION_PATH.exec(path);
-  return m ? decodeURIComponent(m[1]!) : undefined;
+  const segments = (path.split("?")[0] ?? "").split("/").filter((s) => s !== "");
+  if (segments.length < 3) return undefined;
+  const [kind, collection, org] = segments.map(decodeSegment) as [string, string, string];
+  if (!ACTION_KINDS.has(kind.toLowerCase()) || !ACTION_COLLECTIONS.has(collection.toLowerCase())) {
+    return undefined;
+  }
+  return org;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
