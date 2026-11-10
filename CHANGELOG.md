@@ -62,8 +62,10 @@ with bun and publishes nothing.
   `run_script_params` is not a list or that has neither
   `run_script_id` nor `run_script_text`, and `deploy_package` or
   `uninstall_program` params missing `packages`, `display_summary` or
-  `reboot_options`. A `deploy_package` dry run therefore makes one GET
-  per package. See `docs/GOTCHAS.md`.
+  `reboot_options`. `action1_raw_request` on those paths is checked too.
+  A `deploy_package` call, dry run or not, therefore reads each distinct
+  package once; a package missing from the repository, or a read that
+  fails, blocks the call. See `docs/GOTCHAS.md`.
 
 ### Removed
 

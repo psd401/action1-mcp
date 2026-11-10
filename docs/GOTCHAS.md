@@ -98,11 +98,19 @@ preview alone proves nothing. Two live cases (PSD401, 2026-11-10):
 
 `src/tools/actionParams.ts` checks both, and the `packages`,
 `display_summary` and `reboot_options` fields the spec requires for
-`deploy_package` and `uninstall_program`, before the guard on every path
-that creates or updates an automation or policy instance. A
-`deploy_package` check reads the package's versions live, so its dry run
-makes one GET per package. `deploy_update`, `reboot` and
-`run_data_collection` params are not checked.
+`deploy_package` and `uninstall_program`, before the guard on every tool
+that creates or updates an automation or policy instance, including
+`action1_raw_request` on those paths. A `deploy_package` check reads the
+package's versions live, once per distinct package, in a dry run and an
+execution alike. A package that is no longer in the repository answers
+`200` with an empty `text/html` body (measured 2026-11-10), which the
+check reports as not found. A failed read (for example `403` for a
+credential without software-repository access) blocks the call: a
+version that cannot be checked is not sent. A schedule update that
+resends its existing actions is checked too, so a schedule whose package
+version has since left the repository cannot be updated until the version
+is fixed. `deploy_update`, `reboot`, `run_data_collection`, `update_ring`
+and `run_powershell` params are not checked.
 
 ## Deploy update version `Latest` (unverified)
 

@@ -108,6 +108,44 @@ describe("checkActionParams: deleted package", () => {
   });
 });
 
+describe("checkActionParams: repository read failures", () => {
+  it("reports a 403 on the version read as a failed check, naming the status", async () => {
+    const client = {
+      request: vi.fn(async () => {
+        throw new Action1ApiError({ status: 403, url: "https://x/y", method: "GET", body: "" });
+      }),
+    } as unknown as Action1Client;
+    await expect(checkActionParams(client, ORG, [deployAction("7.39.21108.0")])).rejects.toThrow(
+      /could not check the versions of .*HTTP 403/s,
+    );
+  });
+
+  it("reads a package listed twice only once", async () => {
+    const { client, request } = repoClient(REPO);
+    const twice = {
+      template_id: "deploy_package",
+      name: "Deploy Software",
+      params: {
+        display_summary: "CrowdStrike",
+        packages: [{ [PKG]: "7.39.21108.0" }, { [PKG]: "7.39.21108.0" }],
+        reboot_options: { auto_reboot: "no" },
+      },
+    };
+    await expect(checkActionParams(client, ORG, [twice])).resolves.toBeUndefined();
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it("collects the problems of every action in one error", async () => {
+    const { client } = repoClient(REPO);
+    await expect(
+      checkActionParams(client, ORG, [
+        deployAction("7.39.21108_1787098706695"),
+        libraryScriptAction(""),
+      ]),
+    ).rejects.toThrow(/actions\[0\].*version id.*actions\[1\].*run_script_params/s);
+  });
+});
+
 describe("checkActionParams: run_script", () => {
   it("accepts a library script with run_script_params []", async () => {
     const { client } = repoClient({});

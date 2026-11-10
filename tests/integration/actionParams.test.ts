@@ -68,6 +68,14 @@ function upstream(): string[] {
       const method = init.method ?? "GET";
       const path = new URL(url).pathname;
       calls.push(`${method} ${path}`);
+      if (path.endsWith(`/software-repository/${ORG}/Deleted_Package_1`)) {
+        // Measured 2026-11-10: a package no longer in the repository answers
+        // 200 with an empty text/html body.
+        return new Response("", {
+          status: 200,
+          headers: { "Content-Type": "text/html; charset=UTF-8" },
+        });
+      }
       if (path.endsWith(`/software-repository/${ORG}/${PKG}`)) {
         return json({ id: PKG, versions: [{ id: VERSION_ID, version: VERSION_TEXT }] });
       }
@@ -206,5 +214,107 @@ describe("action params are checked before the guard", () => {
       },
     });
     expect(r.isError ?? false).toBe(false);
+  });
+
+  it("a deleted package (200, empty text/html) is reported as not found through the real client", async () => {
+    const calls = upstream();
+    const client = await connect();
+    const r = await client.callTool({
+      name: "action1_deploy_package",
+      arguments: {
+        endpoint_id: EP,
+        params: {
+          display_summary: "x",
+          packages: [{ Deleted_Package_1: "1" }],
+          reboot_options: { auto_reboot: "no" },
+        },
+      },
+    });
+    expect(r.isError).toBe(true);
+    expect(textOf(r)).toMatch(/Deleted_Package_1.*not found in the software repository/s);
+    expect(posts(calls)).toEqual([]);
+  });
+
+  it("action1_create_automation_schedule: a version id fails in the dry run", async () => {
+    const calls = upstream();
+    const client = await connect();
+    const r = await client.callTool({
+      name: "action1_create_automation_schedule",
+      arguments: {
+        body: {
+          name: "Weekly CrowdStrike",
+          settings: "ENABLED EVERY:360 AT:08-32-00 DATE:2026-11-11",
+          retry_minutes: "1440",
+          endpoints: [{ id: EP, type: "Endpoint" }],
+          actions: [
+            {
+              template_id: "deploy_package",
+              name: "Deploy Software",
+              params: deployParams(VERSION_ID),
+            },
+          ],
+        },
+      },
+    });
+    expect(r.isError).toBe(true);
+    expect(textOf(r)).toContain(`version text "${VERSION_TEXT}"`);
+    expect(posts(calls)).toEqual([]);
+  });
+
+  it("action1_update_automation: a PATCH that sends bad actions fails in the dry run", async () => {
+    const calls = upstream();
+    const client = await connect();
+    const r = await client.callTool({
+      name: "action1_update_automation",
+      arguments: {
+        automation_id: "sched-1",
+        body: {
+          actions: [
+            {
+              template_id: "run_script",
+              name: "Run Script",
+              params: {
+                run_script_id: "SentinelOne___Uninstall_1787626092390",
+                run_script_params: "",
+              },
+            },
+          ],
+        },
+      },
+    });
+    expect(r.isError).toBe(true);
+    expect(textOf(r)).toMatch(/run_script_params must be a list/);
+    expect(calls.filter((c) => c.startsWith("PATCH "))).toEqual([]);
+  });
+
+  it("action1_raw_request: a POST to automation instances with bad params fails in the dry run", async () => {
+    process.env.ACTION1_ALLOW_ACCOUNT_OPS = "true";
+    const calls = upstream();
+    const client = await connect();
+    const r = await client.callTool({
+      name: "action1_raw_request",
+      arguments: {
+        method: "POST",
+        path: `/automations/instances/${ORG}`,
+        body: {
+          name: "Run Script",
+          retry_minutes: "1440",
+          endpoints: [{ id: EP, type: "Endpoint" }],
+          actions: [
+            {
+              template_id: "run_script",
+              name: "Run Script",
+              params: {
+                run_script_id: "SentinelOne___Uninstall_1787626092390",
+                run_script_params: "",
+              },
+            },
+          ],
+        },
+      },
+    });
+    expect(r.isError).toBe(true);
+    expect(textOf(r)).toMatch(/run_script_params must be a list/);
+    expect(posts(calls)).toEqual([]);
   });
 });

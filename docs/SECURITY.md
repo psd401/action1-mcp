@@ -84,7 +84,13 @@ read feeds the offline-abort check. `action1_run_script` with
 `target_type: "EndpointGroup"` takes the OS from its `os` argument and
 makes no upstream call for a preview. `action1_reboot_endpoint` runs its
 connectivity probe only after the guard, so its preview makes no upstream
-call either.
+call either. Every tool that creates or updates an automation or policy
+instance (`action1_deploy_package` and the other template tools,
+`action1_execute_and_wait`, the generated automation instance and schedule
+tools, and `action1_raw_request` on those paths) checks the action params
+before the guard; for each `deploy_package` package it reads
+`GET /software-repository/{org}/{package}?fields=versions`, so those
+previews make one read per package. See `docs/GOTCHAS.md`.
 
 ### Limiting what the model can reach
 

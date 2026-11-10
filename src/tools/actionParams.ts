@@ -86,6 +86,33 @@ interface RepoVersion {
   version?: unknown;
 }
 
+type RepoRead = { versions: RepoVersion[] } | { missing: true } | { failed: string };
+
+async function readVersions(
+  client: Action1Client,
+  orgId: string,
+  packageId: string,
+  signal: AbortSignal | undefined,
+): Promise<RepoRead> {
+  try {
+    const pkg = await client.request<{ versions?: unknown }>(
+      `/software-repository/${encodeURIComponent(orgId)}/${encodeURIComponent(packageId)}`,
+      { method: "GET", query: { fields: "versions" }, ...(signal ? { signal } : {}) },
+    );
+    // A package that is no longer in the repository comes back as
+    // HTTP 200 with an empty text/html body (measured 2026-11-10), not 404.
+    if (typeof pkg !== "object" || pkg === null) return { missing: true };
+    if (!Array.isArray(pkg.versions)) return { failed: "no versions list in the answer" };
+    return { versions: pkg.versions as RepoVersion[] };
+  } catch (err) {
+    if (err instanceof Action1ApiError) {
+      if (err.status === 404) return { missing: true };
+      return { failed: `HTTP ${err.status}` };
+    }
+    throw err;
+  }
+}
+
 async function checkDeployVersions(
   client: Action1Client,
   orgId: string,
@@ -93,34 +120,26 @@ async function checkDeployVersions(
   entries: [string, string][],
   problems: string[],
   signal: AbortSignal | undefined,
+  reads: Map<string, Promise<RepoRead>>,
 ): Promise<void> {
   for (const [packageId, version] of entries) {
-    let versions: RepoVersion[];
-    try {
-      const pkg = await client.request<{ versions?: unknown }>(
-        `/software-repository/${encodeURIComponent(orgId)}/${encodeURIComponent(packageId)}`,
-        { method: "GET", query: { fields: "versions" }, ...(signal ? { signal } : {}) },
-      );
-      // A package that is no longer in the repository comes back as
-      // HTTP 200 with an empty text/html body (measured 2026-11-10), not 404.
-      if (typeof pkg !== "object" || pkg === null) {
-        problems.push(`${where}: package "${packageId}" not found in the software repository`);
-        continue;
-      }
-      if (!Array.isArray(pkg.versions)) {
-        problems.push(
-          `${where}: could not read the versions of "${packageId}" from the software repository (no versions list in the answer)`,
-        );
-        continue;
-      }
-      versions = pkg.versions as RepoVersion[];
-    } catch (err) {
-      if (err instanceof Action1ApiError && err.status === 404) {
-        problems.push(`${where}: package "${packageId}" not found in the software repository`);
-        continue;
-      }
-      throw err;
+    let read = reads.get(packageId);
+    if (!read) {
+      read = readVersions(client, orgId, packageId, signal);
+      reads.set(packageId, read);
     }
+    const result = await read;
+    if ("missing" in result) {
+      problems.push(`${where}: package "${packageId}" not found in the software repository`);
+      continue;
+    }
+    if ("failed" in result) {
+      problems.push(
+        `${where}: could not check the versions of "${packageId}" in the software repository (${result.failed}); nothing is sent unless the version can be checked`,
+      );
+      continue;
+    }
+    const versions = result.versions;
     const texts = versions.map((v) => v.version).filter((v): v is string => typeof v === "string");
     if (texts.includes(version)) continue;
     const byId = versions.find((v) => v.id === version);
@@ -152,6 +171,7 @@ export async function checkActionParams(
 ): Promise<void> {
   if (!Array.isArray(actions)) return;
   const problems: string[] = [];
+  const reads = new Map<string, Promise<RepoRead>>();
   for (const [i, action] of actions.entries()) {
     if (!isRecord(action)) continue;
     const where = `actions[${i}].params`;
@@ -160,7 +180,7 @@ export async function checkActionParams(
       case "deploy_package": {
         const entries = packageEntries(where, params.packages, problems);
         requireCommon(where, params, problems);
-        await checkDeployVersions(client, orgId, where, entries, problems, signal);
+        await checkDeployVersions(client, orgId, where, entries, problems, signal, reads);
         break;
       }
       case "uninstall_program":

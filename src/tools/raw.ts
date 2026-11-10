@@ -5,6 +5,7 @@ import { formatShape, jsonResult, runTool, singleObjectOutputShape } from "./hel
 import { destructiveGuardShape, runDestructive } from "./destructiveGuard.js";
 import { GENERATED_SKIPPED_OPERATIONS, GENERATED_TOOL_MANIFEST } from "./generated/index.js";
 import { assertPathOrgAllowed, assertPayloadOrgsAllowed } from "./orgScope.js";
+import { checkActionParams, orgIdFromActionPath } from "./actionParams.js";
 
 /** Documented API path templates, for the org check on free-form paths. */
 const API_PATH_TEMPLATES = [...GENERATED_TOOL_MANIFEST, ...GENERATED_SKIPPED_OPERATIONS];
@@ -65,6 +66,20 @@ export function registerRawTool(server: McpServer, client: Action1Client): void 
         assertPayloadOrgsAllowed(args.query);
         assertPayloadOrgsAllowed(inlineQuery(args.path));
         assertPayloadOrgsAllowed(args.body);
+        // Action params on automation and policy creates and updates are
+        // checked before the guard, as on the dedicated tools.
+        const actionOrg =
+          args.method === "POST" || args.method === "PUT" || args.method === "PATCH"
+            ? orgIdFromActionPath(args.path)
+            : undefined;
+        if (actionOrg !== undefined) {
+          await checkActionParams(
+            client,
+            actionOrg,
+            (args.body as { actions?: unknown } | undefined)?.actions,
+            ctx.mcpReq.signal,
+          );
+        }
         const perform = async (): Promise<CallToolResult> => {
           const data = await client.request<unknown>(args.path, {
             method: args.method,
