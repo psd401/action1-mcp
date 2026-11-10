@@ -118,7 +118,13 @@ const CHECKS: Record<string, () => Promise<void>> = {
     expect(body).toContain('"success_exit_codes":"0"');
   },
   uninstall_program: async () => {
-    const body = await previewBody("action1_uninstall_program", { params: {} });
+    const body = await previewBody("action1_uninstall_program", {
+      params: {
+        display_summary: "x",
+        packages: [{ "name:x.msi": "*" }],
+        reboot_options: { auto_reboot: "no" },
+      },
+    });
     expect(body).toContain('"template_id":"uninstall_program"');
   },
   action1_remove_endpoint_from_group: async () => {

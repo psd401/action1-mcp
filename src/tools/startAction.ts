@@ -20,6 +20,7 @@ import { isEndpointActuallyOnline } from "../utils/lastSeen.js";
 import { detectPlatform } from "../utils/osDetect.js";
 import { runDestructive, type DestructiveGuardInput } from "./destructiveGuard.js";
 import { errorResult, jsonResult, upstreamBodyText } from "./helpers.js";
+import { checkActionParams, orgIdFromActionPath } from "./actionParams.js";
 
 // ----- Shared input fragments ------------------------------------------
 
@@ -230,6 +231,12 @@ export async function startAction(
   args: DestructiveGuardInput & { response_format?: "json" | "markdown" | undefined },
   spec: StartActionSpec,
 ): Promise<CallToolResult> {
+  // Params are checked before the guard so a dry run reports a bad
+  // version or param type instead of echoing the request.
+  const orgId = orgIdFromActionPath(spec.path);
+  if (orgId !== undefined) {
+    await checkActionParams(client, orgId, (spec.payload as { actions?: unknown }).actions);
+  }
   return runDestructive(
     args,
     { toolName: spec.toolName, preview: { method: "POST", path: spec.path, body: spec.payload } },

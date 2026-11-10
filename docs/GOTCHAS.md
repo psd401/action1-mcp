@@ -81,6 +81,29 @@ fallbacks stay because none of them can shadow a spec field the live
 records carry. `bun run live:shapes` (see `TESTING.md`) repeats the
 check without exposing record values.
 
+## Action params Action1 accepts and then fails
+
+Action1's create call takes an action whose params are wrong for the
+template and fails it on the endpoint seconds later, so the guard's
+preview alone proves nothing. Two live cases (PSD401, 2026-11-10):
+
+- `deploy_package` sent the version **id** (`7.39.21108_1787098706695`)
+  as the version. The value must be the version **text**
+  (`7.39.21108.0`): `versions[].version` from
+  `GET /software-repository/{orgId}/{packageId}?fields=versions`, not
+  `versions[].id`.
+- A Script Library `run_script` sent `run_script_params: ""`. It must be
+  a list (`[]` for a script without parameters); the spec's
+  `ScriptParams` is an array.
+
+`src/tools/actionParams.ts` checks both, and the `packages`,
+`display_summary` and `reboot_options` fields the spec requires for
+`deploy_package` and `uninstall_program`, before the guard on every path
+that creates or updates an automation or policy instance. A
+`deploy_package` check reads the package's versions live, so its dry run
+makes one GET per package. `deploy_update`, `reboot` and
+`run_data_collection` params are not checked.
+
 ## Deploy update version `Latest` (unverified)
 
 `action1_deploy_update` sends each `updates[]` entry as

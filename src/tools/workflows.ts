@@ -28,6 +28,7 @@ import {
   successExitCodesSchema,
 } from "./startAction.js";
 import { checkDestructiveGuard, destructiveGuardShape } from "./destructiveGuard.js";
+import { checkActionParams } from "./actionParams.js";
 
 import { AUTOMATION_TERMINAL_STATUSES, isTerminalAutomationStatus } from "../spec/entities.js";
 
@@ -222,6 +223,7 @@ export function registerWorkflowTools(server: McpServer, client: Action1Client):
           });
         }
 
+        await checkActionParams(client, orgId, (payload as { actions?: unknown }).actions, signal);
         const guard = checkDestructiveGuard(args, {
           toolName: "action1_execute_and_wait",
           preview: { method: "POST", path: postPath, body: payload },

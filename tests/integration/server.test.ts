@@ -373,19 +373,14 @@ describe("MCP server: tools/call + resources/read with stubbed fetch", () => {
       expectedTemplate: "deploy_update",
     },
     {
-      tool: "action1_deploy_package",
-      args: {
-        endpoint_id: "00000000-0000-0000-0000-000000000000",
-        params: { package: "AnyDesk" },
-        dry_run: true,
-      },
-      expectedTemplate: "deploy_package",
-    },
-    {
       tool: "action1_uninstall_program",
       args: {
         endpoint_id: "00000000-0000-0000-0000-000000000000",
-        params: { program: "AnyDesk" },
+        params: {
+          display_summary: "AnyDesk",
+          packages: [{ "name:AnyDesk.msi": "*" }],
+          reboot_options: { auto_reboot: "no" },
+        },
         dry_run: true,
       },
       expectedTemplate: "uninstall_program",

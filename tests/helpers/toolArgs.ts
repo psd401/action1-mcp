@@ -83,6 +83,23 @@ export const SWEEP_ARG_OVERRIDES: Readonly<Record<string, Json>> = {
   action1_reboot_endpoint: { skip_connectivity_check: true },
   // A documented path instead of the schema's minimal "/x".
   action1_raw_request: { path: "/me" },
+  // Template params are checked before sending (src/tools/actionParams.ts):
+  // spec-valid shapes, and for deploy_package the version the spec stub's
+  // software-repository answer lists.
+  action1_deploy_package: {
+    params: {
+      display_summary: "x",
+      packages: [{ x: "244.178.44.111" }],
+      reboot_options: { auto_reboot: "no" },
+    },
+  },
+  action1_uninstall_program: {
+    params: {
+      display_summary: "x",
+      packages: [{ "name:x.msi": "*" }],
+      reboot_options: { auto_reboot: "no" },
+    },
+  },
 };
 
 /** Minimal arguments plus the sweep overrides of the tool. */

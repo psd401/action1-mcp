@@ -1,0 +1,177 @@
+// ABOUTME: Pre-flight check of action params before an automation or policy instance is created or previewed.
+// ABOUTME: Shapes follow the pinned spec (DeployPackage, UninstallPackage, RunScript); deploy versions are read live.
+import type { Action1Client } from "../client/action1Client.js";
+import { Action1ApiError } from "../client/errors.js";
+
+/**
+ * Raised when an action's params would be accepted by Action1's create
+ * call but fail on the endpoint, or are malformed. Runs before the
+ * destructive guard, so a dry run reports it instead of echoing the
+ * request.
+ */
+export class ActionParamsError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ActionParamsError";
+  }
+}
+
+const ACTION_PATH = /^\/(?:automations|policies)\/(?:instances|schedules)\/([^/?]+)/;
+
+/** Org id of an action create or update path, undefined for any other path. */
+export function orgIdFromActionPath(path: string): string | undefined {
+  const m = ACTION_PATH.exec(path);
+  return m ? decodeURIComponent(m[1]!) : undefined;
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+/** packages: non-empty array of objects whose values are all strings. */
+function packageEntries(where: string, packages: unknown, problems: string[]): [string, string][] {
+  if (!Array.isArray(packages) || packages.length === 0) {
+    problems.push(
+      `${where}.packages must be a non-empty list of {"<package id>": "<version>"} objects`,
+    );
+    return [];
+  }
+  const out: [string, string][] = [];
+  packages.forEach((entry, i) => {
+    if (!isRecord(entry) || Object.keys(entry).length === 0) {
+      problems.push(`${where}.packages[${i}] must be an object {"<package id>": "<version>"}`);
+      return;
+    }
+    for (const [id, version] of Object.entries(entry)) {
+      if (typeof version !== "string") {
+        problems.push(
+          `${where}.packages[${i}]["${id}"] must be a string version, got ${typeof version}`,
+        );
+      } else {
+        out.push([id, version]);
+      }
+    }
+  });
+  return out;
+}
+
+function requireCommon(where: string, params: Record<string, unknown>, problems: string[]): void {
+  if (typeof params.display_summary !== "string") {
+    problems.push(`${where}.display_summary is required (string)`);
+  }
+  if (!isRecord(params.reboot_options)) {
+    problems.push(`${where}.reboot_options is required (object, e.g. {"auto_reboot": "no"})`);
+  }
+}
+
+function checkRunScript(where: string, params: Record<string, unknown>, problems: string[]): void {
+  if (!Array.isArray(params.run_script_params)) {
+    const got =
+      params.run_script_params === undefined ? "nothing" : JSON.stringify(params.run_script_params);
+    problems.push(
+      `${where}.run_script_params must be a list (send [] for a script without parameters), got ${got}`,
+    );
+  }
+  const hasId = typeof params.run_script_id === "string" && params.run_script_id.length > 0;
+  const hasText = typeof params.run_script_text === "string" && params.run_script_text.length > 0;
+  if (!hasId && !hasText) {
+    problems.push(
+      `${where} needs run_script_id (a library script) or run_script_text with run_script_language`,
+    );
+  }
+}
+
+interface RepoVersion {
+  id?: unknown;
+  version?: unknown;
+}
+
+async function checkDeployVersions(
+  client: Action1Client,
+  orgId: string,
+  where: string,
+  entries: [string, string][],
+  problems: string[],
+  signal: AbortSignal | undefined,
+): Promise<void> {
+  for (const [packageId, version] of entries) {
+    let versions: RepoVersion[];
+    try {
+      const pkg = await client.request<{ versions?: unknown }>(
+        `/software-repository/${encodeURIComponent(orgId)}/${encodeURIComponent(packageId)}`,
+        { method: "GET", query: { fields: "versions" }, ...(signal ? { signal } : {}) },
+      );
+      if (typeof pkg !== "object" || pkg === null || !Array.isArray(pkg.versions)) {
+        problems.push(
+          `${where}: could not read the versions of "${packageId}" from the software repository (no versions list in the answer)`,
+        );
+        continue;
+      }
+      versions = pkg.versions as RepoVersion[];
+    } catch (err) {
+      if (err instanceof Action1ApiError && err.status === 404) {
+        problems.push(`${where}: package "${packageId}" not found in the software repository`);
+        continue;
+      }
+      throw err;
+    }
+    const texts = versions.map((v) => v.version).filter((v): v is string => typeof v === "string");
+    if (texts.includes(version)) continue;
+    const byId = versions.find((v) => v.id === version);
+    if (byId && typeof byId.version === "string") {
+      problems.push(
+        `${where}: "${version}" is the version id of "${packageId}"; deploy_package takes the version text "${byId.version}"`,
+      );
+    } else {
+      problems.push(
+        `${where}: "${packageId}" has no version "${version}"; versions in the repository: ${
+          texts.length ? texts.map((t) => `"${t}"`).join(", ") : "none"
+        }`,
+      );
+    }
+  }
+}
+
+/**
+ * Validate every action in `actions`. Templates without a check here
+ * pass through. Throws ActionParamsError listing every problem found.
+ * deploy_package versions are compared with the live software
+ * repository, so this makes one GET per package, dry run included.
+ */
+export async function checkActionParams(
+  client: Action1Client,
+  orgId: string,
+  actions: unknown,
+  signal?: AbortSignal,
+): Promise<void> {
+  if (!Array.isArray(actions)) return;
+  const problems: string[] = [];
+  for (const [i, action] of actions.entries()) {
+    if (!isRecord(action)) continue;
+    const where = `actions[${i}].params`;
+    const params = isRecord(action.params) ? action.params : {};
+    switch (action.template_id) {
+      case "deploy_package": {
+        const entries = packageEntries(where, params.packages, problems);
+        requireCommon(where, params, problems);
+        await checkDeployVersions(client, orgId, where, entries, problems, signal);
+        break;
+      }
+      case "uninstall_program":
+        packageEntries(where, params.packages, problems);
+        requireCommon(where, params, problems);
+        break;
+      case "run_script":
+        checkRunScript(where, params, problems);
+        break;
+      default:
+        break;
+    }
+  }
+  if (problems.length > 0) {
+    throw new ActionParamsError(
+      "Action params rejected before sending (nothing was started):\n" +
+        problems.map((p) => `  - ${p}`).join("\n"),
+    );
+  }
+}
