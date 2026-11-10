@@ -101,7 +101,13 @@ async function checkDeployVersions(
         `/software-repository/${encodeURIComponent(orgId)}/${encodeURIComponent(packageId)}`,
         { method: "GET", query: { fields: "versions" }, ...(signal ? { signal } : {}) },
       );
-      if (typeof pkg !== "object" || pkg === null || !Array.isArray(pkg.versions)) {
+      // A package that is no longer in the repository comes back as
+      // HTTP 200 with an empty text/html body (measured 2026-11-10), not 404.
+      if (typeof pkg !== "object" || pkg === null) {
+        problems.push(`${where}: package "${packageId}" not found in the software repository`);
+        continue;
+      }
+      if (!Array.isArray(pkg.versions)) {
         problems.push(
           `${where}: could not read the versions of "${packageId}" from the software repository (no versions list in the answer)`,
         );

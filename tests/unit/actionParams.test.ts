@@ -96,11 +96,14 @@ describe("checkActionParams: deploy_package", () => {
   });
 });
 
-describe("checkActionParams: unreadable repository answer", () => {
-  it("says the versions could not be read instead of calling the version absent", async () => {
+describe("checkActionParams: deleted package", () => {
+  // Measured 2026-11-10: for a package no longer in the repository Action1
+  // answers HTTP 200 with an empty text/html body, not 404. The client
+  // returns that body as a string.
+  it("treats an empty non-JSON answer as package not found", async () => {
     const client = { request: vi.fn(async () => "") } as unknown as Action1Client;
     await expect(checkActionParams(client, ORG, [deployAction("7.39.21108.0")])).rejects.toThrow(
-      /could not read the versions/,
+      /not found in the software repository/,
     );
   });
 });
