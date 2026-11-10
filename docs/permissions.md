@@ -13,6 +13,10 @@ you use. A 403 from a tool usually means its permission is missing.
 Operations whose spec entry names no permission are marked (not stated in spec).
 Curated tools that call an operation without a generated tool of their
 own are not listed by name; their descriptions name the endpoint they use.
+Every tool that creates or updates an automation or policy instance with a
+`deploy_package` action also reads `GET /software-repository/{orgId}/{packageId}`
+before the guard, dry run included, so it needs `view_software_repository`
+as well (see `docs/GOTCHAS.md`).
 
 ## By permission
 

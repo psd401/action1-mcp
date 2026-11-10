@@ -88,9 +88,11 @@ call either. Every tool that creates or updates an automation or policy
 instance (`action1_deploy_package` and the other template tools,
 `action1_execute_and_wait`, the generated automation instance and schedule
 tools, and `action1_raw_request` on those paths) checks the action params
-before the guard; for each `deploy_package` package it reads
-`GET /software-repository/{org}/{package}?fields=versions`, so those
-previews make one read per package. See `docs/GOTCHAS.md`.
+before the guard; for each distinct `deploy_package` package it reads
+`GET /software-repository/{org}/{package}?fields=versions`. The read runs
+before the guard decides, so it also happens on a preview and on a call
+the guard then refuses (destructive operations or account operations
+off). See `docs/GOTCHAS.md`.
 
 ### Limiting what the model can reach
 

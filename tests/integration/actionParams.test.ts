@@ -1,5 +1,5 @@
 // ABOUTME: End-to-end (MCP client to stubbed Action1 HTTP) proof that bad action params fail before any POST.
-// ABOUTME: Covers the template tools, execute_and_wait template mode and the generated automation-instance tool.
+// ABOUTME: Covers deploy_package and uninstall_program, execute_and_wait, generated instance, schedule create and update, and raw_request.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Client } from "@modelcontextprotocol/client";
 
@@ -315,6 +315,18 @@ describe("action params are checked before the guard", () => {
     });
     expect(r.isError).toBe(true);
     expect(textOf(r)).toMatch(/run_script_params must be a list/);
+    expect(posts(calls)).toEqual([]);
+  });
+
+  it("action1_uninstall_program: params without packages fail in the dry run", async () => {
+    const calls = upstream();
+    const client = await connect();
+    const r = await client.callTool({
+      name: "action1_uninstall_program",
+      arguments: { endpoint_id: EP, params: { program: "AnyDesk" } },
+    });
+    expect(r.isError).toBe(true);
+    expect(textOf(r)).toMatch(/packages must be a non-empty list/);
     expect(posts(calls)).toEqual([]);
   });
 });

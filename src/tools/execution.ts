@@ -334,7 +334,7 @@ function registerTemplateTool<S extends z.ZodRawShape>(
       outputSchema: okStatusOutputShape,
       annotations: DESTRUCTIVE_ANNOTATIONS,
     },
-    async (rawArgs) =>
+    async (rawArgs, ctx) =>
       runTool(async () => {
         const args = rawArgs as z.infer<z.ZodObject<typeof templateBaseShape>> &
           z.infer<z.ZodObject<typeof nameShape>>;
@@ -350,6 +350,7 @@ function registerTemplateTool<S extends z.ZodRawShape>(
         });
         return startAction(client, args, {
           toolName: spec.name,
+          signal: ctx.mcpReq.signal,
           path: policyInstancesPath(orgId),
           payload,
         });

@@ -303,7 +303,7 @@ describe("action1_run_script OS routing", () => {
       {
         // GET /endpoints/managed/{orgId}/{endpointId}
         match: (url, init) =>
-          (init.method ?? "GET") === "GET" &&
+          (init?.method ?? "GET") === "GET" &&
           url.includes("/endpoints/managed/") &&
           url.endsWith(ENDPOINT_UUID),
         body: {
@@ -340,7 +340,7 @@ describe("action1_run_script OS routing", () => {
     const stub = buildFetchStub([
       {
         match: (url, init) =>
-          (init.method ?? "GET") === "GET" &&
+          (init?.method ?? "GET") === "GET" &&
           url.includes("/endpoints/managed/") &&
           url.endsWith(ENDPOINT_UUID),
         body: {

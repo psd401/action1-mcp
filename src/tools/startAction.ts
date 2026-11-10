@@ -220,6 +220,8 @@ export interface StartActionSpec extends StartRequest {
    * never reaches it. Return a result to abort.
    */
   beforePost?: () => Promise<CallToolResult | null>;
+  /** The tool call's abort signal, for the reads made before the guard. */
+  signal?: AbortSignal | undefined;
 }
 
 /**
@@ -235,7 +237,12 @@ export async function startAction(
   // version or param type instead of echoing the request.
   const orgId = orgIdFromActionPath(spec.path);
   if (orgId !== undefined) {
-    await checkActionParams(client, orgId, (spec.payload as { actions?: unknown }).actions);
+    await checkActionParams(
+      client,
+      orgId,
+      (spec.payload as { actions?: unknown }).actions,
+      spec.signal,
+    );
   }
   return runDestructive(
     args,

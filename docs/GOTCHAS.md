@@ -104,9 +104,12 @@ that creates or updates an automation or policy instance, including
 package's versions live, once per distinct package, in a dry run and an
 execution alike. A package that is no longer in the repository answers
 `200` with an empty `text/html` body (measured 2026-11-10), which the
-check reports as not found. A failed read (for example `403` for a
-credential without software-repository access) blocks the call: a
-version that cannot be checked is not sent. A schedule update that
+check reports as not found. Any other answer that is not a package record,
+and any failed read (for example `403` for a credential without
+`view_software_repository`), blocks the call as a failed check: a version
+that cannot be checked is not sent. A bad `run_script_params` is reported
+by type only, never by value, since script parameters can carry
+credentials. A schedule update that
 resends its existing actions is checked too, so a schedule whose package
 version has since left the repository cannot be updated until the version
 is fixed. `deploy_update`, `reboot`, `run_data_collection`, `update_ring`

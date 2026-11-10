@@ -55,6 +55,14 @@ function packageEntries(where: string, packages: unknown, problems: string[]): [
   return out;
 }
 
+function describeType(v: unknown): string {
+  if (v === undefined) return "nothing";
+  if (v === null) return "null";
+  if (typeof v === "string") return v === "" ? "an empty string" : "a string";
+  if (typeof v === "object") return "an object";
+  return `a ${typeof v}`;
+}
+
 function requireCommon(where: string, params: Record<string, unknown>, problems: string[]): void {
   if (typeof params.display_summary !== "string") {
     problems.push(`${where}.display_summary is required (string)`);
@@ -66,8 +74,8 @@ function requireCommon(where: string, params: Record<string, unknown>, problems:
 
 function checkRunScript(where: string, params: Record<string, unknown>, problems: string[]): void {
   if (!Array.isArray(params.run_script_params)) {
-    const got =
-      params.run_script_params === undefined ? "nothing" : JSON.stringify(params.run_script_params);
+    // Only the type is reported: script parameters can carry credentials.
+    const got = describeType(params.run_script_params);
     problems.push(
       `${where}.run_script_params must be a list (send [] for a script without parameters), got ${got}`,
     );
@@ -95,15 +103,18 @@ async function readVersions(
   signal: AbortSignal | undefined,
 ): Promise<RepoRead> {
   try {
-    const pkg = await client.request<{ versions?: unknown }>(
+    // The client returns a non-JSON body as text, so the answer is unknown.
+    const pkg = await client.request<unknown>(
       `/software-repository/${encodeURIComponent(orgId)}/${encodeURIComponent(packageId)}`,
       { method: "GET", query: { fields: "versions" }, ...(signal ? { signal } : {}) },
     );
     // A package that is no longer in the repository comes back as
     // HTTP 200 with an empty text/html body (measured 2026-11-10), not 404.
-    if (typeof pkg !== "object" || pkg === null) return { missing: true };
-    if (!Array.isArray(pkg.versions)) return { failed: "no versions list in the answer" };
-    return { versions: pkg.versions as RepoVersion[] };
+    if (pkg === "" || pkg === undefined || pkg === null) return { missing: true };
+    if (typeof pkg !== "object") return { failed: "the answer was not a package record" };
+    const versions = (pkg as { versions?: unknown }).versions;
+    if (!Array.isArray(versions)) return { failed: "no versions list in the answer" };
+    return { versions: versions as RepoVersion[] };
   } catch (err) {
     if (err instanceof Action1ApiError) {
       if (err.status === 404) return { missing: true };

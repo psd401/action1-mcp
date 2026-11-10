@@ -120,6 +120,22 @@ describe("checkActionParams: repository read failures", () => {
     );
   });
 
+  it("reports a non-empty non-JSON answer as a failed read, not as not found", async () => {
+    const client = {
+      request: vi.fn(async () => "<html>maintenance</html>"),
+    } as unknown as Action1Client;
+    await expect(checkActionParams(client, ORG, [deployAction("7.39.21108.0")])).rejects.toThrow(
+      /could not check the versions of .*not a package record/s,
+    );
+  });
+
+  it("passes the caller's abort signal to the version read", async () => {
+    const { client, request } = repoClient(REPO);
+    const signal = new AbortController().signal;
+    await checkActionParams(client, ORG, [deployAction("7.39.21108.0")], signal);
+    expect(request).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ signal }));
+  });
+
   it("reads a package listed twice only once", async () => {
     const { client, request } = repoClient(REPO);
     const twice = {
@@ -159,6 +175,16 @@ describe("checkActionParams: run_script", () => {
     await expect(checkActionParams(client, ORG, [libraryScriptAction("")])).rejects.toThrow(
       /run_script_params.*list/s,
     );
+  });
+
+  it("never echoes the run_script_params value, only its type", async () => {
+    const { client } = repoClient({});
+    const err = await checkActionParams(client, ORG, [
+      libraryScriptAction({ api_key: "sk-SECRET-VALUE" }),
+    ]).catch((e: unknown) => e as Error);
+    expect(err).toBeInstanceOf(Error);
+    expect(err!.message).toContain("got an object");
+    expect(err!.message).not.toContain("sk-SECRET-VALUE");
   });
 
   it("rejects a missing run_script_params", async () => {
