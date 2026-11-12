@@ -131,19 +131,14 @@ describe.each([
     expectPathContains: "/policies/instances/",
   },
   {
-    tool: "action1_deploy_package",
-    args: {
-      endpoint_id: ENDPOINT_UUID,
-      params: { package: "AnyDesk" },
-      dry_run: true,
-    },
-    expectPathContains: "/policies/instances/",
-  },
-  {
     tool: "action1_uninstall_program",
     args: {
       endpoint_id: ENDPOINT_UUID,
-      params: { program: "AnyDesk" },
+      params: {
+        display_summary: "AnyDesk",
+        packages: [{ "name:AnyDesk.msi": "*" }],
+        reboot_options: { auto_reboot: "no" },
+      },
       dry_run: true,
     },
     expectPathContains: "/policies/instances/",
@@ -236,6 +231,38 @@ describe("destructive tools - input validation", () => {
       },
     });
     expect(result.isError).toBe(true);
+  });
+
+  it("action1_deploy_package dry_run=true reads the package versions once and posts nothing", async () => {
+    const stub = buildFetchStub([
+      {
+        match: (url, init) =>
+          (init.method ?? "GET") === "GET" &&
+          url.includes("/software-repository/") &&
+          url.includes("/AnyDesk_pkg"),
+        body: { id: "AnyDesk_pkg", versions: [{ id: "9.0_1", version: "9.0" }] },
+      },
+    ]);
+    vi.stubGlobal("fetch", stub);
+    const result = await CLIENT.callTool({
+      name: "action1_deploy_package",
+      arguments: {
+        endpoint_id: ENDPOINT_UUID,
+        params: {
+          display_summary: "AnyDesk 9.0",
+          packages: [{ AnyDesk_pkg: "9.0" }],
+          reboot_options: { auto_reboot: "no" },
+        },
+        dry_run: true,
+      },
+    });
+    expect(result.isError).toBeFalsy();
+    const sc = result.structuredContent as Record<string, unknown>;
+    expect(sc.dry_run).toBe(true);
+    expect((sc.would_send as { path: string }).path).toContain("/policies/instances/");
+    const calls = stub.mock.calls.filter((c) => !String(c[0]).endsWith("/oauth2/token"));
+    expect(calls).toHaveLength(1);
+    expect((calls[0]![1] as RequestInit | undefined)?.method ?? "GET").toBe("GET");
   });
 
   it("action1_deploy_package rejects missing params", async () => {

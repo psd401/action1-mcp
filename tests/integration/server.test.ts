@@ -373,19 +373,14 @@ describe("MCP server: tools/call + resources/read with stubbed fetch", () => {
       expectedTemplate: "deploy_update",
     },
     {
-      tool: "action1_deploy_package",
-      args: {
-        endpoint_id: "00000000-0000-0000-0000-000000000000",
-        params: { package: "AnyDesk" },
-        dry_run: true,
-      },
-      expectedTemplate: "deploy_package",
-    },
-    {
       tool: "action1_uninstall_program",
       args: {
         endpoint_id: "00000000-0000-0000-0000-000000000000",
-        params: { program: "AnyDesk" },
+        params: {
+          display_summary: "AnyDesk",
+          packages: [{ "name:AnyDesk.msi": "*" }],
+          reboot_options: { auto_reboot: "no" },
+        },
         dry_run: true,
       },
       expectedTemplate: "uninstall_program",
@@ -427,6 +422,47 @@ describe("MCP server: tools/call + resources/read with stubbed fetch", () => {
       expect(nonTokenCalls.length).toBe(0);
     },
   );
+
+  it("tools/call action1_deploy_package with dry_run=true returns preview after one repository read", async () => {
+    const stub = buildFetchStub([
+      {
+        match: (url, init) =>
+          (init.method ?? "GET") === "GET" &&
+          url.includes("/software-repository/") &&
+          url.includes("/AnyDesk_pkg"),
+        body: { id: "AnyDesk_pkg", versions: [{ id: "9.0_1", version: "9.0" }] },
+      },
+    ]);
+    vi.stubGlobal("fetch", stub);
+
+    const result = await CLIENT.callTool({
+      name: "action1_deploy_package",
+      arguments: {
+        endpoint_id: "00000000-0000-0000-0000-000000000000",
+        params: {
+          display_summary: "AnyDesk 9.0",
+          packages: [{ AnyDesk_pkg: "9.0" }],
+          reboot_options: { auto_reboot: "no" },
+        },
+        dry_run: true,
+      },
+    });
+    expect(result.isError ?? false).toBe(false);
+    const sc = result.structuredContent as Record<string, unknown>;
+    expect(sc.dry_run).toBe(true);
+    expect(sc.tool).toBe("action1_deploy_package");
+    const would = sc.would_send as {
+      method: string;
+      path: string;
+      body: { actions: { template_id: string }[] };
+    };
+    expect(would.method).toBe("POST");
+    expect(would.path.startsWith("/policies/instances/")).toBe(true);
+    expect(would.body.actions[0]?.template_id).toBe("deploy_package");
+    const nonTokenCalls = stub.mock.calls.filter((c) => !String(c[0]).endsWith("/oauth2/token"));
+    expect(nonTokenCalls).toHaveLength(1);
+    expect((nonTokenCalls[0]![1] as RequestInit | undefined)?.method ?? "GET").toBe("GET");
+  });
 
   it("tools/call action1_deploy_update preview lists the supplied package id in params.packages", async () => {
     const stub = buildFetchStub([]);

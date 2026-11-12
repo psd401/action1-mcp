@@ -81,6 +81,40 @@ fallbacks stay because none of them can shadow a spec field the live
 records carry. `bun run live:shapes` (see `TESTING.md`) repeats the
 check without exposing record values.
 
+## Action params Action1 accepts and then fails
+
+Action1's create call takes an action whose params are wrong for the
+template and fails it on the endpoint seconds later, so the guard's
+preview alone proves nothing. Two live cases (PSD401, 2026-11-10):
+
+- `deploy_package` sent the version **id** (`7.39.21108_1787098706695`)
+  as the version. The value must be the version **text**
+  (`7.39.21108.0`): `versions[].version` from
+  `GET /software-repository/{orgId}/{packageId}?fields=versions`, not
+  `versions[].id`.
+- A Script Library `run_script` sent `run_script_params: ""`. It must be
+  a list (`[]` for a script without parameters); the spec's
+  `ScriptParams` is an array.
+
+`src/tools/actionParams.ts` checks both, and the `packages`,
+`display_summary` and `reboot_options` fields the spec requires for
+`deploy_package` and `uninstall_program`, before the guard on every tool
+that creates or updates an automation or policy instance, including
+`action1_raw_request` on those paths. A `deploy_package` check reads the
+package's versions live, once per distinct package, in a dry run and an
+execution alike. A package that is no longer in the repository answers
+`200` with an empty `text/html` body (measured 2026-11-10), which the
+check reports as not found. Any other answer that is not a package record,
+and any failed read (for example `403` for a credential without
+`view_software_repository`), blocks the call as a failed check: a version
+that cannot be checked is not sent. A bad `run_script_params` is reported
+by type only, never by value, since script parameters can carry
+credentials. A schedule update that
+resends its existing actions is checked too, so a schedule whose package
+version has since left the repository cannot be updated until the version
+is fixed. `deploy_update`, `reboot`, `run_data_collection`, `update_ring`
+and `run_powershell` params are not checked.
+
 ## Deploy update version `Latest` (unverified)
 
 `action1_deploy_update` sends each `updates[]` entry as

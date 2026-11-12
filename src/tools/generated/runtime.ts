@@ -12,6 +12,7 @@ import {
 } from "../helpers.js";
 import type { OutputFormat } from "../helpers.js";
 import { assertPayloadOrgsAllowed } from "../orgScope.js";
+import { checkActionParams, orgIdFromActionPath } from "../actionParams.js";
 import { envelopePage, parsePageEnvelope } from "../../client/pagination.js";
 import { capItemList, compactItem } from "../../utils/capOutput.js";
 import { buildCursor, fingerprintQuery, pagedFetch } from "../../utils/cursor.js";
@@ -64,6 +65,21 @@ export async function runGenerated(opts: RunGeneratedOptions): Promise<CallToolR
     // Org ids inside the body (target_organization_id, organization_ids,
     // ...) are held to ACTION1_ALLOWED_ORG_IDS like the org_id argument.
     assertPayloadOrgsAllowed(opts.body);
+    // Action params on automation and policy creates and updates are
+    // checked before the guard, so a dry run reports a bad version or
+    // param type instead of echoing the request.
+    const actionOrg =
+      opts.method === "POST" || opts.method === "PUT" || opts.method === "PATCH"
+        ? orgIdFromActionPath(opts.path)
+        : undefined;
+    if (actionOrg !== undefined) {
+      await checkActionParams(
+        opts.client,
+        actionOrg,
+        (opts.body as { actions?: unknown } | undefined)?.actions,
+        opts.signal,
+      );
+    }
     const perform = async (): Promise<CallToolResult> => {
       // List contract of paginated GET tools: `limit` is the most items
       // one call returns, `from` the first record when no cursor is

@@ -52,6 +52,20 @@ with bun and publishes nothing.
   instead of a `.env` file. The docs drop `.env` files for secrets:
   laptops use the Keychain or the MCPB wizard, Linux services use a
   root-owned mode-0600 environment file outside the checkout.
+- **Action params are checked before the guard.** Creating or updating
+  an automation or policy instance (the template tools,
+  `action1_execute_and_wait` in template mode, and the generated
+  `/automations/instances` and `/automations/schedules` tools) now
+  rejects, in a dry run too, a `deploy_package` version that is not a
+  version text of that package in the software repository (a version id
+  gets the version text to send instead), a `run_script` action whose
+  `run_script_params` is not a list or that has neither
+  `run_script_id` nor `run_script_text`, and `deploy_package` or
+  `uninstall_program` params missing `packages`, `display_summary` or
+  `reboot_options`. `action1_raw_request` on those paths is checked too.
+  A `deploy_package` call, dry run or not, therefore reads each distinct
+  package once; a package missing from the repository, or a read that
+  fails, blocks the call. See `docs/GOTCHAS.md`.
 
 ### Removed
 
