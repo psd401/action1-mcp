@@ -6,6 +6,7 @@ import { runDestructive } from "../destructiveGuard.js";
 import {
   cappedListResult,
   compactionNote,
+  errorResult,
   jsonResult,
   pagedListResult,
   runTool,
@@ -13,7 +14,11 @@ import {
 import type { OutputFormat } from "../helpers.js";
 import { assertPayloadOrgsAllowed } from "../orgScope.js";
 import { checkActionParams, orgIdFromActionPath } from "../actionParams.js";
-import { createdDespite400 } from "../startAction.js";
+import {
+  CREATED_DESPITE_400_WARNING,
+  createdDespite400,
+  mayHaveStartedNote,
+} from "../startAction.js";
 import { envelopePage, parsePageEnvelope } from "../../client/pagination.js";
 import { capItemList, compactItem } from "../../utils/capOutput.js";
 import { buildCursor, fingerprintQuery, pagedFetch } from "../../utils/cursor.js";
@@ -134,18 +139,18 @@ export async function runGenerated(opts: RunGeneratedOptions): Promise<CallToolR
         });
       } catch (err) {
         // A create POST that Action1 answers with 400 "automation instance
-        // with id=<id> not found" may still have started that run: report it.
-        const created =
+        // with id=<id> not found" may still have started that run.
+        const readBack =
           opts.method === "POST"
             ? await createdDespite400(opts.client, opts.path, err, opts.signal)
             : undefined;
-        if (created === undefined) throw err;
-        data = {
-          ...(created as Record<string, unknown>),
-          warning:
-            "Action1 answered the create request with HTTP 400 'automation instance ... not found', " +
-            "but the run exists and was started. It was not re-sent.",
-        };
+        if (readBack === undefined) throw err;
+        if (readBack.kind === "inconclusive") {
+          return errorResult(
+            `${readBack.error.toToolErrorText()}\n\n${mayHaveStartedNote(readBack.runId)}`,
+          );
+        }
+        data = { ...readBack.run, warning: CREATED_DESPITE_400_WARNING };
       }
       // Apply a defensive cap to single-call responses that look
       // list-shaped (Action1 uses {items: [...]} envelopes and bare

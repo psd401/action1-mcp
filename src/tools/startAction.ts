@@ -261,13 +261,16 @@ export async function startAction(
           retry: false,
         });
       } catch (err) {
-        const created = await createdDespite400(client, spec.path, err, spec.signal);
-        if (created === undefined) throw err;
-        return startedJobResult(created, args.response_format, {
+        const readBack = await createdDespite400(client, spec.path, err, spec.signal);
+        if (readBack === undefined) throw err;
+        if (readBack.kind === "inconclusive") {
+          return errorResult(
+            `${readBack.error.toToolErrorText()}\n\n${mayHaveStartedNote(readBack.runId)}`,
+          );
+        }
+        return startedJobResult(readBack.run, args.response_format, {
           ...spec.extra,
-          warning:
-            "Action1 answered the create request with HTTP 400 'automation instance ... not found', " +
-            "but the run exists and was started. It was not re-sent.",
+          warning: CREATED_DESPITE_400_WARNING,
         });
       }
       return startedJobResult(response, args.response_format, spec.extra);
@@ -281,28 +284,64 @@ export async function startAction(
 // re-send the POST, which would start a second run.
 const NOT_FOUND_AFTER_CREATE = /automation instance with id=([A-Za-z0-9_.-]+) not found/;
 
+export const CREATED_DESPITE_400_WARNING =
+  "Action1 answered the create request with HTTP 400 'automation instance ... not found', " +
+  "but the run exists and was started. It was not re-sent.";
+
+/** Text added to the error when the read-back cannot confirm the run either way. */
+export function mayHaveStartedNote(runId: string): string {
+  return (
+    `Action1 named automation instance ${runId} in this HTTP 400, and it may have started. ` +
+    `Check it with action1_get_automation_status or action1_list_recent_automations before sending this request again.`
+  );
+}
+
+export type CreateReadBack =
+  | { kind: "created"; run: Record<string, unknown> }
+  | { kind: "inconclusive"; runId: string; error: Action1ApiError };
+
+/**
+ * For a create POST that failed: undefined unless the failure is Action1's
+ * 400 "automation instance with id=<id> not found". Then one GET of that
+ * run: "created" when Action1 returns it, "inconclusive" otherwise (a
+ * failed read or a run not visible yet does not prove nothing started).
+ * A cancelled call is re-thrown.
+ */
+/**
+ * The org of a create POST path (`/policies/instances/{org}` or
+ * `/automations/instances/{org}`), else undefined. Longer paths such as
+ * `.../instances/{org}/{id}/stop` and schedule creates are not run creates.
+ */
+function createPathOrgId(path: string): string | undefined {
+  const segments = (path.split("?")[0] ?? "").split("/").filter((s) => s !== "");
+  if (segments.length !== 3 || segments[1]!.toLowerCase() !== "instances") return undefined;
+  return orgIdFromActionPath(path);
+}
+
 export async function createdDespite400(
   client: Action1Client,
   path: string,
   err: unknown,
   signal: AbortSignal | undefined,
-): Promise<unknown> {
+): Promise<CreateReadBack | undefined> {
   if (!(err instanceof Action1ApiError) || err.status !== 400) return undefined;
   const match = NOT_FOUND_AFTER_CREATE.exec(err.body ?? "");
-  const orgId = orgIdFromActionPath(path);
+  const orgId = createPathOrgId(path);
   if (!match || orgId === undefined) return undefined;
+  const runId = match[1]!;
   try {
     const run = await client.request<unknown>(
-      `/automations/instances/${encodeURIComponent(orgId)}/${encodeURIComponent(match[1]!)}`,
+      `/automations/instances/${encodeURIComponent(orgId)}/${encodeURIComponent(runId)}`,
       { signal },
     );
-    return extractInstanceId(run) === match[1] ? run : undefined;
+    if (run && typeof run === "object" && extractInstanceId(run) === runId) {
+      return { kind: "created", run: run as Record<string, unknown> };
+    }
   } catch (readErr) {
-    // A cancelled call must surface as cancelled, not as the 400 that says
-    // nothing started.
+    // A cancelled call must surface as cancelled, not as the 400.
     if (signal?.aborted) throw readErr;
-    return undefined;
   }
+  return { kind: "inconclusive", runId, error: err };
 }
 
 /**

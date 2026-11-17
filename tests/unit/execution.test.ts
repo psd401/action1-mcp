@@ -1098,7 +1098,7 @@ describe("create POST answered with 400 'automation instance ... not found'", ()
     }
   });
 
-  it("returns the original 400 and does not re-send when the run does not exist", async () => {
+  it("returns the 400 with a may-have-started note and does not re-send when the read-back finds no run", async () => {
     process.env.ACTION1_ALLOW_DESTRUCTIVE = "true";
     resetConfigCache();
     const stub = buildFetchStub([
@@ -1111,6 +1111,8 @@ describe("create POST answered with 400 'automation instance ... not found'", ()
       expect(result.isError).toBe(true);
       const text = (result.content as { text: string }[])[0]!.text;
       expect(text).toContain("HTTP 400");
+      expect(text).toMatch(/may have started/i);
+      expect(text).toContain(RUN_ID);
       const posts = stub.mock.calls.filter(
         (c) =>
           ((c[1] as RequestInit | undefined)?.method ?? "GET") === "POST" &&

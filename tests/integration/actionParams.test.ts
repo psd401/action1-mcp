@@ -390,6 +390,33 @@ describe("generated create tool: 400 'automation instance ... not found' after c
     expect(calls.filter((c) => c.startsWith("POST ")).length).toBe(1);
   });
 
+  it("does not read back after a stop POST answered with that 400", async () => {
+    const calls = upstreamCreated400(true);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init: RequestInit = {}) => {
+        if (url.endsWith("/oauth2/token")) return json({ access_token: "tkn", expires_in: 3600 });
+        const method = init.method ?? "GET";
+        const path = new URL(url).pathname;
+        calls.push(`${method} ${path}`);
+        if (method === "POST" && path.endsWith(`/automations/instances/${ORG}/${RUN_ID}/stop`)) {
+          return json(
+            { status: 400, developer_message: `automation instance with id=${RUN_ID} not found` },
+            400,
+          );
+        }
+        return json({ id: RUN_ID, status: "Running" });
+      }),
+    );
+    const client = await connect();
+    const r = await client.callTool({
+      name: "action1_stop_instance",
+      arguments: { instance_id: RUN_ID, dry_run: false, confirm: "YES" },
+    });
+    expect(r.isError).toBe(true);
+    expect(calls.filter((c) => c.startsWith("GET "))).toEqual([]);
+  });
+
   it("returns the original 400 when the run does not exist, and posts once", async () => {
     const calls = upstreamCreated400(false);
     const client = await connect();
@@ -399,6 +426,7 @@ describe("generated create tool: 400 'automation instance ... not found' after c
     });
     expect(r.isError).toBe(true);
     expect(textOf(r)).toMatch(/HTTP 400/);
+    expect(textOf(r)).toMatch(/may have started/i);
     expect(calls.filter((c) => c.startsWith("POST ")).length).toBe(1);
   });
 });

@@ -83,7 +83,8 @@ with bun and publishes nothing.
   id=<id> not found" after starting that run. The start tools,
   `action1_execute_and_wait` and `action1_create_automation_instance`
   now read the named run back once and report
-  it as started (with a warning) when it exists; the POST is never
+  it as started (with a warning) when it exists, or say it may have
+  started when the read-back cannot confirm it; the POST is never
   re-sent. See `docs/GOTCHAS.md`.
 
 ## [Unreleased]
