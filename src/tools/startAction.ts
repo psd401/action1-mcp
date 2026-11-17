@@ -11,6 +11,7 @@
 import type { CallToolResult } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import type { Action1Client } from "../client/action1Client.js";
+import { Action1ApiError } from "../client/errors.js";
 import { fetchEndpointInfo } from "../client/endpointInfo.js";
 import type { AppConfig } from "../config.js";
 import { buildMacOsBashPayload } from "../payloads/macOsBash.js";
@@ -252,14 +253,53 @@ export async function startAction(
         const abort = await spec.beforePost();
         if (abort) return abort;
       }
-      const response = await client.request<unknown>(spec.path, {
-        method: "POST",
-        body: spec.payload,
-        retry: false,
-      });
+      let response: unknown;
+      try {
+        response = await client.request<unknown>(spec.path, {
+          method: "POST",
+          body: spec.payload,
+          retry: false,
+        });
+      } catch (err) {
+        const created = await createdDespite400(client, spec.path, err, spec.signal);
+        if (created === undefined) throw err;
+        return startedJobResult(created, args.response_format, {
+          ...spec.extra,
+          warning:
+            "Action1 answered the create request with HTTP 400 'automation instance ... not found', " +
+            "but the run exists and was started. It was not re-sent.",
+        });
+      }
       return startedJobResult(response, args.response_format, spec.extra);
     },
   );
+}
+
+// Action1 sometimes answers POST /policies/instances/{org} with HTTP 400
+// "automation instance with id=<id> not found" after it has created and
+// started that run (seen 2026-11-16). Read the named run back once; never
+// re-send the POST, which would start a second run.
+const NOT_FOUND_AFTER_CREATE = /automation instance with id=([A-Za-z0-9_.-]+) not found/;
+
+export async function createdDespite400(
+  client: Action1Client,
+  path: string,
+  err: unknown,
+  signal: AbortSignal | undefined,
+): Promise<unknown> {
+  if (!(err instanceof Action1ApiError) || err.status !== 400) return undefined;
+  const match = NOT_FOUND_AFTER_CREATE.exec(err.body ?? "");
+  const orgId = orgIdFromActionPath(path);
+  if (!match || orgId === undefined) return undefined;
+  try {
+    const run = await client.request<unknown>(
+      `/automations/instances/${encodeURIComponent(orgId)}/${encodeURIComponent(match[1]!)}`,
+      { signal },
+    );
+    return extractInstanceId(run) === match[1] ? run : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**

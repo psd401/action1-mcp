@@ -127,3 +127,16 @@ carry `available_updates[].version: "Latest"` for Windows updates, which
 `action1_cve_remediation_plan` hands on as a candidate. Whether a deploy
 with `Latest` (or with an empty string) succeeds has not been tried: it
 needs a real deploy against a test endpoint.
+
+## Create POST answered with 400 although the run was created
+
+On 2026-11-16, `POST /policies/instances/{orgId}` (a `deploy_package`
+run) returned HTTP 400 with `developer_message` "automation instance with
+id=<id> not found", yet Action1 had created and started that run; it
+finished Success. The start tools (`startAction.ts`) and
+`action1_execute_and_wait` therefore read the named run back once with
+`GET /automations/instances/{orgId}/{id}` when a create POST fails with
+exactly that 400. If the run exists, the tool reports it as started, with
+a warning; otherwise it returns the original error. The POST is never
+re-sent, so the run cannot start twice. Seen once; the cause on Action1's
+side is unknown.

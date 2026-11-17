@@ -22,6 +22,7 @@ import { buildSimplePolicyPayload } from "../payloads/policyInstance.js";
 import { detectPlatform, type Platform } from "../utils/osDetect.js";
 import {
   buildScriptRequest,
+  createdDespite400,
   policyInstancesPath,
   probeEndpoint,
   resolveScriptPlatform,
@@ -243,20 +244,28 @@ export function registerWorkflowTools(server: McpServer, client: Action1Client):
             ...(signal ? { signal } : {}),
           });
         } catch (err) {
-          // A 4xx means Action1 rejected the request: nothing started.
-          // Any other failure (5xx, timeout, connection reset after the
-          // send) may have reached Action1, so the action may be running.
-          const startError =
-            err instanceof Action1ApiError
-              ? err.toToolErrorText()
-              : err instanceof Error
-                ? err.message
-                : String(err);
-          const rejected = err instanceof Action1ApiError && err.status >= 400 && err.status < 500;
-          if (rejected) return errorResult(startError);
-          return errorResult(
-            `${startError}\n\nNote: the action may have started server-side despite this error; check action1_list_recent_automations for the most recent instance to confirm.`,
-          );
+          // Action1 can answer 400 "automation instance with id=<id> not found"
+          // after creating and starting that run: follow the run it names.
+          const created = await createdDespite400(client, postPath, err, signal);
+          if (created !== undefined) {
+            startResponse = created as { id?: unknown };
+          } else {
+            // A 4xx means Action1 rejected the request: nothing started.
+            // Any other failure (5xx, timeout, connection reset after the
+            // send) may have reached Action1, so the action may be running.
+            const startError =
+              err instanceof Action1ApiError
+                ? err.toToolErrorText()
+                : err instanceof Error
+                  ? err.message
+                  : String(err);
+            const rejected =
+              err instanceof Action1ApiError && err.status >= 400 && err.status < 500;
+            if (rejected) return errorResult(startError);
+            return errorResult(
+              `${startError}\n\nNote: the action may have started server-side despite this error; check action1_list_recent_automations for the most recent instance to confirm.`,
+            );
+          }
         }
         const instanceId = typeof startResponse?.id === "string" ? startResponse.id : undefined;
         if (!instanceId) {

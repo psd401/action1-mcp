@@ -1033,3 +1033,116 @@ describe("raw upstream bodies in error texts", () => {
     }
   });
 });
+
+// ----- Action1 answers the create POST with 400 "instance ... not found" -----
+//
+// Seen 2026-11-16: POST /policies/instances/{org} returned HTTP 400
+// "automation instance with id=<id> not found" although Action1 had created
+// and started that run. The tool reads the named run back once; it never
+// re-sends the POST.
+
+describe("create POST answered with 400 'automation instance ... not found'", () => {
+  const ORG = "00000000-0000-0000-0000-000000000001";
+  const RUN_ID = "Uninstall_test_1794871237344_2026-11-16_23-20-37";
+  const notFoundBody = {
+    id: "0",
+    type: "Error",
+    status: 400,
+    developer_message: `automation instance with id=${RUN_ID} not found`,
+    user_message: `automation instance with id=${RUN_ID} not found`,
+  };
+  const isPost = (url: string, init: RequestInit) =>
+    (init?.method ?? "GET") === "POST" && url.includes(`/policies/instances/${ORG}`);
+  const isReadBack = (url: string, init: RequestInit) =>
+    (init?.method ?? "GET") === "GET" && url.includes(`/automations/instances/${ORG}/${RUN_ID}`);
+
+  async function callReboot() {
+    return CLIENT.callTool({
+      name: "action1_uninstall_program",
+      arguments: {
+        endpoint_id: ENDPOINT_UUID,
+        params: {
+          display_summary: "AnyDesk",
+          packages: [{ "name:AnyDesk.msi": "*" }],
+          reboot_options: { auto_reboot: "no" },
+        },
+        dry_run: false,
+        confirm: "YES",
+      },
+    });
+  }
+
+  it("reports the run as started when the read-back finds it, with a warning", async () => {
+    process.env.ACTION1_ALLOW_DESTRUCTIVE = "true";
+    resetConfigCache();
+    const stub = buildFetchStub([
+      { match: isPost, status: 400, body: notFoundBody },
+      { match: isReadBack, body: { id: RUN_ID, type: "AutomationInstance", status: "Running" } },
+    ]);
+    vi.stubGlobal("fetch", stub);
+    try {
+      const result = await callReboot();
+      expect(result.isError).toBeFalsy();
+      const sc = result.structuredContent as { instance_id: string; warning: string };
+      expect(sc.instance_id).toBe(RUN_ID);
+      expect(sc.warning).toContain("HTTP 400");
+      const posts = stub.mock.calls.filter(
+        (c) =>
+          ((c[1] as RequestInit | undefined)?.method ?? "GET") === "POST" &&
+          !String(c[0]).endsWith("/oauth2/token"),
+      );
+      expect(posts.length).toBe(1);
+    } finally {
+      delete process.env.ACTION1_ALLOW_DESTRUCTIVE;
+      resetConfigCache();
+    }
+  });
+
+  it("returns the original 400 and does not re-send when the run does not exist", async () => {
+    process.env.ACTION1_ALLOW_DESTRUCTIVE = "true";
+    resetConfigCache();
+    const stub = buildFetchStub([
+      { match: isPost, status: 400, body: notFoundBody },
+      { match: isReadBack, status: 404, body: { status: 404, developer_message: "not found" } },
+    ]);
+    vi.stubGlobal("fetch", stub);
+    try {
+      const result = await callReboot();
+      expect(result.isError).toBe(true);
+      const text = (result.content as { text: string }[])[0]!.text;
+      expect(text).toContain("HTTP 400");
+      const posts = stub.mock.calls.filter(
+        (c) =>
+          ((c[1] as RequestInit | undefined)?.method ?? "GET") === "POST" &&
+          !String(c[0]).endsWith("/oauth2/token"),
+      );
+      expect(posts.length).toBe(1);
+    } finally {
+      delete process.env.ACTION1_ALLOW_DESTRUCTIVE;
+      resetConfigCache();
+    }
+  });
+
+  it("does not read back on any other 400", async () => {
+    process.env.ACTION1_ALLOW_DESTRUCTIVE = "true";
+    resetConfigCache();
+    const stub = buildFetchStub([
+      {
+        match: isPost,
+        status: 400,
+        body: { status: 400, developer_message: "Invalid package version" },
+      },
+    ]);
+    vi.stubGlobal("fetch", stub);
+    try {
+      const result = await callReboot();
+      expect(result.isError).toBe(true);
+      expect((result.content as { text: string }[])[0]!.text).toContain("HTTP 400");
+      const reads = stub.mock.calls.filter((c) => String(c[0]).includes("/automations/instances/"));
+      expect(reads.length).toBe(0);
+    } finally {
+      delete process.env.ACTION1_ALLOW_DESTRUCTIVE;
+      resetConfigCache();
+    }
+  });
+});

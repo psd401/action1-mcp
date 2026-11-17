@@ -229,6 +229,29 @@ describe("action1_execute_and_wait", () => {
     }
   });
 
+  it("follows the run when Action1 answers the start with 400 'automation instance ... not found' but created it", async () => {
+    process.env.ACTION1_ALLOW_DESTRUCTIVE = "true";
+    resetConfigCache();
+    const { calls } = upstream({
+      start: () =>
+        json(
+          {
+            status: 400,
+            developer_message: `automation instance with id=${INSTANCE} not found`,
+          },
+          400,
+        ),
+      statuses: ["Running", "Success"],
+    });
+    const result = await CLIENT.callTool({
+      name: "action1_execute_and_wait",
+      arguments: executeArgs(),
+    });
+    expect(result.isError).toBeFalsy();
+    expect(text(result)).toContain(INSTANCE);
+    expect(calls.filter((c) => c.method === "POST").length).toBe(1);
+  });
+
   it("keeps the 'may have started' note for a 5xx start error, with the upstream body", async () => {
     process.env.ACTION1_ALLOW_DESTRUCTIVE = "true";
     resetConfigCache();
