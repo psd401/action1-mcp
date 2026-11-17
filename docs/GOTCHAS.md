@@ -133,10 +133,13 @@ needs a real deploy against a test endpoint.
 On 2026-11-16, `POST /policies/instances/{orgId}` (a `deploy_package`
 run) returned HTTP 400 with `developer_message` "automation instance with
 id=<id> not found", yet Action1 had created and started that run; it
-finished Success. The start tools (`startAction.ts`) and
-`action1_execute_and_wait` therefore read the named run back once with
+finished Success. The start tools (`startAction.ts`),
+`action1_execute_and_wait` and the generated create tools (a POST to an
+`instances` path) therefore read the named run back once with
 `GET /automations/instances/{orgId}/{id}` when a create POST fails with
 exactly that 400. If the run exists, the tool reports it as started, with
 a warning; otherwise it returns the original error. The POST is never
-re-sent, so the run cannot start twice. Seen once; the cause on Action1's
-side is unknown.
+re-sent, so the run cannot start twice. A call cancelled during the
+read-back reports the cancellation, not the 400. `action1_raw_request`
+returns Action1's answer as is: after that 400, check the endpoint's runs
+before sending again. Seen once; the cause on Action1's side is unknown.

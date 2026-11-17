@@ -330,3 +330,75 @@ describe("action params are checked before the guard", () => {
     expect(posts(calls)).toEqual([]);
   });
 });
+
+describe("generated create tool: 400 'automation instance ... not found' after creating", () => {
+  const RUN_ID = "Run_Script_test_1794871237344_2026-11-16_23-20-37";
+
+  function upstreamCreated400(runExists: boolean): string[] {
+    const calls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init: RequestInit = {}) => {
+        if (url.endsWith("/oauth2/token")) return json({ access_token: "tkn", expires_in: 3600 });
+        const method = init.method ?? "GET";
+        const path = new URL(url).pathname;
+        calls.push(`${method} ${path}`);
+        if (method === "POST" && path.endsWith(`/automations/instances/${ORG}`)) {
+          return json(
+            { status: 400, developer_message: `automation instance with id=${RUN_ID} not found` },
+            400,
+          );
+        }
+        if (method === "GET" && path.endsWith(`/automations/instances/${ORG}/${RUN_ID}`)) {
+          return runExists
+            ? json({ id: RUN_ID, type: "AutomationInstance", status: "Running" })
+            : json({ status: 404, developer_message: "not found" }, 404);
+        }
+        return json({ error: "no route" }, 404);
+      }),
+    );
+    return calls;
+  }
+
+  const args = {
+    dry_run: false,
+    confirm: "YES",
+    body: {
+      name: "Run Script: test",
+      retry_minutes: "1440",
+      endpoints: [{ id: EP, type: "Endpoint" }],
+      actions: [
+        {
+          template_id: "run_script",
+          name: "Run Script",
+          params: { run_script_id: "Some_Script_1", run_script_params: [] },
+        },
+      ],
+    },
+  };
+
+  it("reports the run it names when the read-back finds it, and posts once", async () => {
+    const calls = upstreamCreated400(true);
+    const client = await connect();
+    const r = await client.callTool({
+      name: "action1_create_automation_instance",
+      arguments: args,
+    });
+    expect(r.isError ?? false).toBe(false);
+    expect(textOf(r)).toContain(RUN_ID);
+    expect(textOf(r)).toMatch(/HTTP 400/);
+    expect(calls.filter((c) => c.startsWith("POST ")).length).toBe(1);
+  });
+
+  it("returns the original 400 when the run does not exist, and posts once", async () => {
+    const calls = upstreamCreated400(false);
+    const client = await connect();
+    const r = await client.callTool({
+      name: "action1_create_automation_instance",
+      arguments: args,
+    });
+    expect(r.isError).toBe(true);
+    expect(textOf(r)).toMatch(/HTTP 400/);
+    expect(calls.filter((c) => c.startsWith("POST ")).length).toBe(1);
+  });
+});

@@ -13,6 +13,7 @@ import {
 import type { OutputFormat } from "../helpers.js";
 import { assertPayloadOrgsAllowed } from "../orgScope.js";
 import { checkActionParams, orgIdFromActionPath } from "../actionParams.js";
+import { createdDespite400 } from "../startAction.js";
 import { envelopePage, parsePageEnvelope } from "../../client/pagination.js";
 import { capItemList, compactItem } from "../../utils/capOutput.js";
 import { buildCursor, fingerprintQuery, pagedFetch } from "../../utils/cursor.js";
@@ -123,12 +124,29 @@ export async function runGenerated(opts: RunGeneratedOptions): Promise<CallToolR
         );
         return pagedListResult(result, opts.responseFormat, opts.verbose === true);
       }
-      const data = await opts.client.request<unknown>(opts.path, {
-        method: opts.method,
-        ...(opts.queryParams ? { query: stripUndefined(opts.queryParams) } : {}),
-        ...(opts.body !== undefined ? { body: opts.body } : {}),
-        ...(opts.signal ? { signal: opts.signal } : {}),
-      });
+      let data: unknown;
+      try {
+        data = await opts.client.request<unknown>(opts.path, {
+          method: opts.method,
+          ...(opts.queryParams ? { query: stripUndefined(opts.queryParams) } : {}),
+          ...(opts.body !== undefined ? { body: opts.body } : {}),
+          ...(opts.signal ? { signal: opts.signal } : {}),
+        });
+      } catch (err) {
+        // A create POST that Action1 answers with 400 "automation instance
+        // with id=<id> not found" may still have started that run: report it.
+        const created =
+          opts.method === "POST"
+            ? await createdDespite400(opts.client, opts.path, err, opts.signal)
+            : undefined;
+        if (created === undefined) throw err;
+        data = {
+          ...(created as Record<string, unknown>),
+          warning:
+            "Action1 answered the create request with HTTP 400 'automation instance ... not found', " +
+            "but the run exists and was started. It was not re-sent.",
+        };
+      }
       // Apply a defensive cap to single-call responses that look
       // list-shaped (Action1 uses {items: [...]} envelopes and bare
       // arrays interchangeably). The agent can switch to cursor mode

@@ -297,7 +297,10 @@ export async function createdDespite400(
       { signal },
     );
     return extractInstanceId(run) === match[1] ? run : undefined;
-  } catch {
+  } catch (readErr) {
+    // A cancelled call must surface as cancelled, not as the 400 that says
+    // nothing started.
+    if (signal?.aborted) throw readErr;
     return undefined;
   }
 }
