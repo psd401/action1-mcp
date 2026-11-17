@@ -229,6 +229,56 @@ describe("action1_execute_and_wait", () => {
     }
   });
 
+  it("follows the run when Action1 answers the start with 400 'automation instance ... not found' but created it", async () => {
+    process.env.ACTION1_ALLOW_DESTRUCTIVE = "true";
+    resetConfigCache();
+    const { calls } = upstream({
+      start: () =>
+        json(
+          {
+            status: 400,
+            developer_message: `automation instance with id=${INSTANCE} not found`,
+          },
+          400,
+        ),
+      statuses: ["Running", "Success"],
+    });
+    const result = await CLIENT.callTool({
+      name: "action1_execute_and_wait",
+      arguments: executeArgs(),
+    });
+    expect(result.isError).toBeFalsy();
+    expect(text(result)).toContain(INSTANCE);
+    expect(text(result)).toContain("HTTP 400");
+    expect(calls.filter((c) => c.method === "POST").length).toBe(1);
+    expect(
+      calls.filter(
+        (c) => c.method === "GET" && c.url.endsWith(`/automations/instances/${ORG}/${INSTANCE}`),
+      ).length,
+    ).toBeGreaterThanOrEqual(1);
+  });
+
+  it("says the run may have started when the read-back after that 400 finds nothing", async () => {
+    process.env.ACTION1_ALLOW_DESTRUCTIVE = "true";
+    resetConfigCache();
+    const { calls } = upstream({
+      start: () =>
+        json(
+          { status: 400, developer_message: `automation instance with id=${INSTANCE} not found` },
+          400,
+        ),
+      statuses: [json({ message: "not found" }, 404)],
+    });
+    const result = await CLIENT.callTool({
+      name: "action1_execute_and_wait",
+      arguments: executeArgs(),
+    });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toMatch(/may have started/i);
+    expect(text(result)).toContain(INSTANCE);
+    expect(calls.filter((c) => c.method === "POST").length).toBe(1);
+  });
+
   it("keeps the 'may have started' note for a 5xx start error, with the upstream body", async () => {
     process.env.ACTION1_ALLOW_DESTRUCTIVE = "true";
     resetConfigCache();

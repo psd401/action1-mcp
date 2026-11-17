@@ -76,6 +76,17 @@ with bun and publishes nothing.
   still fails when the MCPB bundle holds a package outside the runtime
   tree of `bun.lock`.
 
+### Fixed
+
+- **A run Action1 created is no longer reported as failed.** Action1
+  can answer the create POST with HTTP 400 "automation instance with
+  id=<id> not found" after starting that run. The start tools,
+  `action1_execute_and_wait` and `action1_create_automation_instance`
+  now read the named run back once and report
+  it as started (with a warning) when it exists, or say it may have
+  started when the read-back cannot confirm it; the POST is never
+  re-sent. See `docs/GOTCHAS.md`.
+
 ## [Unreleased]
 
 ## [0.6.2] - 2026-10-27

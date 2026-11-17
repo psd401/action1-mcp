@@ -22,6 +22,9 @@ import { buildSimplePolicyPayload } from "../payloads/policyInstance.js";
 import { detectPlatform, type Platform } from "../utils/osDetect.js";
 import {
   buildScriptRequest,
+  CREATED_DESPITE_400_WARNING,
+  createdDespite400,
+  mayHaveStartedNote,
   policyInstancesPath,
   probeEndpoint,
   resolveScriptPlatform,
@@ -236,6 +239,7 @@ export function registerWorkflowTools(server: McpServer, client: Action1Client):
         // 429 and connect-level failures are retried), so the action
         // cannot start twice because of a retry.
         let startResponse: { id?: unknown };
+        let startWarning: string | undefined;
         try {
           startResponse = await client.request<{ id?: unknown }>(postPath, {
             method: "POST",
@@ -243,20 +247,33 @@ export function registerWorkflowTools(server: McpServer, client: Action1Client):
             ...(signal ? { signal } : {}),
           });
         } catch (err) {
-          // A 4xx means Action1 rejected the request: nothing started.
-          // Any other failure (5xx, timeout, connection reset after the
-          // send) may have reached Action1, so the action may be running.
-          const startError =
-            err instanceof Action1ApiError
-              ? err.toToolErrorText()
-              : err instanceof Error
-                ? err.message
-                : String(err);
-          const rejected = err instanceof Action1ApiError && err.status >= 400 && err.status < 500;
-          if (rejected) return errorResult(startError);
-          return errorResult(
-            `${startError}\n\nNote: the action may have started server-side despite this error; check action1_list_recent_automations for the most recent instance to confirm.`,
-          );
+          // Action1 can answer 400 "automation instance with id=<id> not found"
+          // after creating and starting that run: follow the run it names.
+          const readBack = await createdDespite400(client, postPath, err, signal);
+          if (readBack?.kind === "created") {
+            startResponse = readBack.run;
+            startWarning = CREATED_DESPITE_400_WARNING;
+          } else if (readBack?.kind === "inconclusive") {
+            return errorResult(
+              `${readBack.error.toToolErrorText()}\n\n${mayHaveStartedNote(readBack.runId)}`,
+            );
+          } else {
+            // A 4xx means Action1 rejected the request: nothing started.
+            // Any other failure (5xx, timeout, connection reset after the
+            // send) may have reached Action1, so the action may be running.
+            const startError =
+              err instanceof Action1ApiError
+                ? err.toToolErrorText()
+                : err instanceof Error
+                  ? err.message
+                  : String(err);
+            const rejected =
+              err instanceof Action1ApiError && err.status >= 400 && err.status < 500;
+            if (rejected) return errorResult(startError);
+            return errorResult(
+              `${startError}\n\nNote: the action may have started server-side despite this error; check action1_list_recent_automations for the most recent instance to confirm.`,
+            );
+          }
         }
         const instanceId = typeof startResponse?.id === "string" ? startResponse.id : undefined;
         if (!instanceId) {
@@ -291,13 +308,15 @@ export function registerWorkflowTools(server: McpServer, client: Action1Client):
             `${describeError(err)}\n\nThe action was started as automation instance ${instanceId}; this error happened afterwards, while waiting for its result. Do not re-run the action. Check its status with action1_wait_for_automation (instance_id "${instanceId}", endpoint_id "${args.endpoint_id}") or action1_get_automation_status.`,
           );
         }
+        const warning = startWarning !== undefined ? { warning: startWarning } : {};
         return jsonResult(
-          { instance_id: instanceId, platform, status: finalStatus, output },
+          { instance_id: instanceId, platform, status: finalStatus, output, ...warning },
           {
             instance_id: instanceId,
             platform,
             status: finalStatus,
             output,
+            ...warning,
           },
           args.response_format,
         );
