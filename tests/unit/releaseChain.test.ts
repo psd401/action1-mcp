@@ -172,6 +172,7 @@ describe("workflow hygiene", () => {
     expect(Object.keys(workflows).sort()).toEqual([
       "ci.yml",
       "claude-review.yml",
+      "dependabot-auto-merge.yml",
       "license-check.yml",
       "openwiki-update.yml",
       "psd-ci.yml",
